@@ -74,8 +74,3 @@ CREATE UNIQUE INDEX "users_email_unique" ON "users" USING btree ("email");--> st
 CREATE UNIQUE INDEX "users_phone_unique" ON "users" USING btree ("phone");--> statement-breakpoint
 CREATE INDEX "venues_owner_id_idx" ON "venues" USING btree ("owner_id");--> statement-breakpoint
 CREATE INDEX "venues_search_idx" ON "venues" USING btree ("status","city");
---> statement-breakpoint
-ALTER TABLE "users" ADD CONSTRAINT "users_contact_required" CHECK ("email" IS NOT NULL OR "phone" IS NOT NULL);--> statement-breakpoint
-ALTER TABLE "courts" ADD CONSTRAINT "courts_hourly_rate_non_negative" CHECK ("hourly_rate" >= 0);--> statement-breakpoint
-ALTER TABLE "operating_hours" ADD CONSTRAINT "operating_hours_valid_range" CHECK ("is_closed" OR ("open_time" IS NOT NULL AND "close_time" IS NOT NULL AND "open_time" < "close_time"));--> statement-breakpoint
-ALTER TABLE "bookings" ADD CONSTRAINT "bookings_valid_range" CHECK ("start_at" < "end_at" AND extract(epoch FROM ("end_at" - "start_at"))::integer % 1800 = 0);--> statement-breakpoint

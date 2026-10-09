@@ -5,7 +5,7 @@
   "scripts": {
     "build": "nest build",
     "start": "node dist/src/app.js",
-    "start:dev": "nest start --watch",
+    "dev": "nest start --watch",
     "typecheck": "tsc --noEmit",
     "test": "jest --config jest.config.cjs --runInBand",
     "test:watch": "jest --config jest.config.cjs --watch",

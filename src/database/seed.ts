@@ -12,7 +12,7 @@ async function seed() {
   const config = new EnvConfig();
   const pool = new Pool({ connectionString: config.databaseUrl });
   const db = drizzle(pool, { schema });
-  const passwordHash = await hash('Password123!', 10);
+  const passwordHash = await hash('courthub@123', 10);
   const customerId = createUuidV7();
   const partnerId = createUuidV7();
   const adminId = createUuidV7();
@@ -22,7 +22,7 @@ async function seed() {
     {
       id: customerId,
       fullName: 'Demo Customer',
-      email: 'customer@courthub.dev',
+      email: 'customer@example.com',
       phone: '+84900000001',
       passwordHash,
       role: 'CUSTOMER',
@@ -30,7 +30,7 @@ async function seed() {
     {
       id: partnerId,
       fullName: 'Demo Partner',
-      email: 'partner@courthub.dev',
+      email: 'partner@example.com',
       phone: '+84900000002',
       passwordHash,
       role: 'PARTNER',
@@ -38,7 +38,7 @@ async function seed() {
     {
       id: adminId,
       fullName: 'Demo Admin',
-      email: 'admin@courthub.dev',
+      email: 'admin@example.com',
       phone: '+84900000003',
       passwordHash,
       role: 'ADMIN',
@@ -70,7 +70,7 @@ async function seed() {
     })),
   );
   await pool.end();
-  console.log('CourtHub seed completed. Demo password: Password123!');
+  console.log('CourtHub seed completed.');
 }
 
 void seed().catch((error) => {
