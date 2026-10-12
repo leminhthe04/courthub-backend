@@ -18,11 +18,12 @@ async function seed() {
   const adminId = createUuidV7();
   const venueId = createUuidV7();
   const badmintonCategoryId = createUuidV7();
+  const pickleballCategoryId = createUuidV7();
 
   await db.insert(schema.categories).values([
     {
       id: badmintonCategoryId,
-      name: 'Cầu lông',
+      name: 'Badminton',
       slug: 'badminton',
       isActive: true,
     },
@@ -34,25 +35,25 @@ async function seed() {
     },
     {
       id: createUuidV7(),
-      name: 'Bóng đá',
+      name: 'Football',
       slug: 'football',
       isActive: true,
     },
     {
       id: createUuidV7(),
-      name: 'Bóng rổ',
+      name: 'Basketball',
       slug: 'basketball',
       isActive: true,
     },
     {
-      id: createUuidV7(),
+      id: pickleballCategoryId,
       name: 'Pickleball',
       slug: 'pickleball',
       isActive: true,
     },
     {
       id: createUuidV7(),
-      name: 'Bóng bàn',
+      name: 'Table Tennis',
       slug: 'table-tennis',
       isActive: true,
     },
@@ -61,7 +62,7 @@ async function seed() {
   await db.insert(schema.users).values([
     {
       id: customerId,
-      fullName: 'Demo Customer',
+      fullName: 'Trần Văn Nguyễn',
       email: 'customer@example.com',
       phone: '+84900000001',
       passwordHash,
@@ -77,7 +78,7 @@ async function seed() {
     },
     {
       id: adminId,
-      fullName: 'Demo Admin',
+      fullName: 'Admin',
       email: 'admin@example.com',
       phone: '+84900000003',
       passwordHash,
@@ -87,43 +88,40 @@ async function seed() {
   await db.insert(schema.venues).values({
     id: venueId,
     ownerId: partnerId,
-    categoryId: badmintonCategoryId,
-    name: 'CourtHub District 1',
-    address: '12 Nguyen Hue',
-    city: 'Ho Chi Minh City',
-    description: 'Demo venue for CourtHub booking flow.',
+    categoryId: pickleballCategoryId,
+    name: 'Relaxar',
+    address: '122A Tân Quới Hưng, Long Châu',
+    city: 'Vĩnh Long',
+    description: '',
     status: 'APPROVED',
   });
+
   await db.insert(schema.courts).values([
-    { id: createUuidV7(), venueId, name: 'Court 1' },
-    { id: createUuidV7(), venueId, name: 'Court 2' },
-    { id: createUuidV7(), venueId, name: 'Court 3' },
+    { id: createUuidV7(), venueId, name: 'Sân 1' },
+    { id: createUuidV7(), venueId, name: 'Sân 2' },
+    { id: createUuidV7(), venueId, name: 'Sân 3' },
   ]);
-  await db.insert(schema.venuePricingRules).values([
-    {
-      id: createUuidV7(),
-      venueId,
-      startTime: '05:00',
-      endTime: '13:00',
-      hourlyRate: 150000,
-    },
-    {
-      id: createUuidV7(),
-      venueId,
-      startTime: '15:00',
-      endTime: '22:00',
-      hourlyRate: 200000,
-    },
-  ]);
-  await db.insert(schema.operatingHours).values(
-    Array.from({ length: 7 }, (_, dayOfWeek) => ({
-      id: createUuidV7(),
-      venueId,
-      dayOfWeek,
-      openTime: '06:00',
-      closeTime: '23:00',
-      isClosed: false,
-    })),
+
+  const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
+  await db.insert(schema.venuePricingRules).values(
+    days.flatMap((dayOfWeek) => [
+      {
+        id: createUuidV7(),
+        venueId,
+        dayOfWeek,
+        startTime: '05:00',
+        endTime: '11:00',
+        hourlyRate: 150000,
+      },
+      {
+        id: createUuidV7(),
+        venueId,
+        dayOfWeek,
+        startTime: '13:00',
+        endTime: '20:00',
+        hourlyRate: 200000,
+      },
+    ]),
   );
   await pool.end();
   console.log('CourtHub seed completed.');

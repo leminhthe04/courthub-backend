@@ -5,11 +5,9 @@ import {
   bookings,
   categories,
   courts,
-  operatingHours,
   venuePricingRules,
   venues,
   type NewCourt,
-  type NewOperatingHours,
   type NewVenue,
   type NewVenuePricingRule,
 } from '../../database/schema';
@@ -20,7 +18,6 @@ export type VenueRecord = typeof venues.$inferSelect & {
   categorySlug: string;
 };
 export type CourtRecord = typeof courts.$inferSelect;
-export type OperatingHoursRecord = typeof operatingHours.$inferSelect;
 export type VenuePricingRuleRecord = typeof venuePricingRules.$inferSelect;
 
 @Injectable()
@@ -117,20 +114,12 @@ export class VenuesRepository {
       .orderBy(asc(courts.name));
   }
 
-  listOperatingHours(venueId: string) {
-    return this.db
-      .select()
-      .from(operatingHours)
-      .where(eq(operatingHours.venueId, venueId))
-      .orderBy(asc(operatingHours.dayOfWeek));
-  }
-
   listPricingRules(venueId: string) {
     return this.db
       .select()
       .from(venuePricingRules)
       .where(eq(venuePricingRules.venueId, venueId))
-      .orderBy(asc(venuePricingRules.startTime));
+      .orderBy(asc(venuePricingRules.dayOfWeek), asc(venuePricingRules.startTime));
   }
 
   async createPricingRule(values: NewVenuePricingRule): Promise<VenuePricingRuleRecord> {
@@ -151,7 +140,13 @@ export class VenuesRepository {
 
   async setPricingRules(
     venueId: string,
-    rules: Array<{ id: string; startTime: string; endTime: string; hourlyRate: number }>,
+    rules: Array<{
+      id: string;
+      dayOfWeek: 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
+      startTime: string;
+      endTime: string;
+      hourlyRate: number;
+    }>,
   ): Promise<VenuePricingRuleRecord[]> {
     return this.db.transaction(async (tx) => {
       await tx.delete(venuePricingRules).where(eq(venuePricingRules.venueId, venueId));
@@ -162,6 +157,7 @@ export class VenuesRepository {
           rules.map((rule) => ({
             id: rule.id,
             venueId,
+            dayOfWeek: rule.dayOfWeek,
             startTime: rule.startTime,
             endTime: rule.endTime,
             hourlyRate: rule.hourlyRate,
@@ -244,35 +240,6 @@ export class VenuesRepository {
       .where(eq(courts.id, courtId))
       .returning();
     return court;
-  }
-
-  async findOperatingHours(
-    venueId: string,
-    dayOfWeek: number,
-  ): Promise<OperatingHoursRecord | undefined> {
-    const [hours] = await this.db
-      .select()
-      .from(operatingHours)
-      .where(and(eq(operatingHours.venueId, venueId), eq(operatingHours.dayOfWeek, dayOfWeek)))
-      .limit(1);
-    return hours;
-  }
-
-  async updateOperatingHours(
-    id: string,
-    values: Partial<NewOperatingHours>,
-  ): Promise<OperatingHoursRecord | undefined> {
-    const [hours] = await this.db
-      .update(operatingHours)
-      .set(values)
-      .where(eq(operatingHours.id, id))
-      .returning();
-    return hours;
-  }
-
-  async createOperatingHours(values: NewOperatingHours): Promise<OperatingHoursRecord> {
-    const [hours] = await this.db.insert(operatingHours).values(values).returning();
-    return hours;
   }
 
   listForAdmin(): Promise<VenueRecord[]> {

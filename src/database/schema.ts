@@ -1,7 +1,6 @@
 import {
   boolean,
   index,
-  integer,
   numeric,
   pgEnum,
   pgTable,
@@ -105,20 +104,15 @@ export const courts = pgTable(
   (table) => [index('courts_venue_id_idx').on(table.venueId)],
 );
 
-export const operatingHours = pgTable(
-  'operating_hours',
-  {
-    id: uuid('id').primaryKey(),
-    venueId: uuid('venue_id')
-      .notNull()
-      .references(() => venues.id, { onDelete: 'cascade' }),
-    dayOfWeek: integer('day_of_week').notNull(),
-    openTime: time('open_time'),
-    closeTime: time('close_time'),
-    isClosed: boolean('is_closed').notNull().default(false),
-  },
-  (table) => [uniqueIndex('operating_hours_venue_day_unique').on(table.venueId, table.dayOfWeek)],
-);
+export const dayOfWeekEnum = pgEnum('day_of_week', [
+  'MON',
+  'TUE',
+  'WED',
+  'THU',
+  'FRI',
+  'SAT',
+  'SUN',
+]);
 
 export const venuePricingRules = pgTable(
   'venue_pricing_rules',
@@ -127,13 +121,16 @@ export const venuePricingRules = pgTable(
     venueId: uuid('venue_id')
       .notNull()
       .references(() => venues.id, { onDelete: 'cascade' }),
+    dayOfWeek: dayOfWeekEnum('day_of_week').notNull(),
     startTime: time('start_time').notNull(),
     endTime: time('end_time').notNull(),
     hourlyRate: numeric('hourly_rate', { precision: 12, scale: 2, mode: 'number' }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index('venue_pricing_rules_venue_id_idx').on(table.venueId)],
+  (table) => [
+    index('venue_pricing_rules_venue_day_idx').on(table.venueId, table.dayOfWeek, table.startTime),
+  ],
 );
 
 export const bookings = pgTable(
@@ -193,8 +190,6 @@ export type Venue = typeof venues.$inferSelect;
 export type NewVenue = typeof venues.$inferInsert;
 export type Court = typeof courts.$inferSelect;
 export type NewCourt = typeof courts.$inferInsert;
-export type OperatingHours = typeof operatingHours.$inferSelect;
-export type NewOperatingHours = typeof operatingHours.$inferInsert;
 export type VenuePricingRule = typeof venuePricingRules.$inferSelect;
 export type NewVenuePricingRule = typeof venuePricingRules.$inferInsert;
 export type Booking = typeof bookings.$inferSelect;
@@ -204,3 +199,4 @@ export type NewSession = typeof sessions.$inferInsert;
 export type UserRole = 'CUSTOMER' | 'PARTNER' | 'ADMIN';
 export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'REJECTED';
 export type SessionRevokeReason = 'LOGOUT' | 'ROTATED' | 'EXPIRED' | 'REVOKED_BY_ADMIN';
+export type DayOfWeek = (typeof dayOfWeekEnum.enumValues)[number];

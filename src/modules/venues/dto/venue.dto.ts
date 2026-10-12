@@ -1,13 +1,12 @@
 import {
   IsArray,
   IsBoolean,
-  IsInt,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
   IsUUID,
   Matches,
-  Max,
   MaxLength,
   Min,
   ValidateNested,
@@ -77,6 +76,9 @@ export class UpdateCourtDto {
 }
 
 export class CreateVenuePricingRuleDto {
+  @IsIn(['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'])
+  dayOfWeek!: 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
+
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'startTime must use HH:mm' })
   startTime!: string;
 
@@ -93,24 +95,4 @@ export class SetVenuePricingRulesDto {
   @ValidateNested({ each: true })
   @Type(() => CreateVenuePricingRuleDto)
   rules!: CreateVenuePricingRuleDto[];
-}
-
-export class SetOperatingHoursDto {
-  @IsBoolean()
-  isClosed!: boolean;
-
-  @IsOptional()
-  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'openTime must use HH:mm' })
-  openTime?: string;
-
-  @IsOptional()
-  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'closeTime must use HH:mm' })
-  closeTime?: string;
-}
-
-export class DayOfWeekParamDto {
-  @IsInt()
-  @Min(0)
-  @Max(6)
-  dayOfWeek!: number;
 }

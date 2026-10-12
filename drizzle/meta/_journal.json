@@ -29,6 +29,13 @@
       "when": 1791779000000,
       "tag": "0003_sport_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791800000000,
+      "tag": "0004_weekly_pricing_days",
+      "breakpoints": true
     }
   ]
 }

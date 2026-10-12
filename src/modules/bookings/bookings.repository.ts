@@ -4,10 +4,10 @@ import { DATABASE, type Database } from '../../database/database.module';
 import {
   bookings,
   courts,
-  operatingHours,
   venuePricingRules,
   venues,
   type Booking,
+  type DayOfWeek,
   type NewBooking,
 } from '../../database/schema';
 
@@ -33,21 +33,14 @@ export class BookingsRepository {
     return court;
   }
 
-  async findPricingRules(venueId: string) {
+  async findPricingRules(venueId: string, dayOfWeek: DayOfWeek) {
     return this.db
       .select()
       .from(venuePricingRules)
-      .where(eq(venuePricingRules.venueId, venueId))
+      .where(
+        and(eq(venuePricingRules.venueId, venueId), eq(venuePricingRules.dayOfWeek, dayOfWeek)),
+      )
       .orderBy(asc(venuePricingRules.startTime));
-  }
-
-  async findOperatingHours(venueId: string, dayOfWeek: number) {
-    const [hours] = await this.db
-      .select()
-      .from(operatingHours)
-      .where(and(eq(operatingHours.venueId, venueId), eq(operatingHours.dayOfWeek, dayOfWeek)))
-      .limit(1);
-    return hours;
   }
 
   async create(values: NewBooking): Promise<BookingRecord> {

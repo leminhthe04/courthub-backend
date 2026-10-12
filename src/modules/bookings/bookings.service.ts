@@ -9,6 +9,7 @@ import {
 import { createHash, randomBytes } from 'node:crypto';
 import type { AuthUser } from '../../common/auth.types';
 import { ErrorCode } from '../../common/error-codes';
+import { dayOfWeekFromDate } from '../../common/day-of-week';
 import { createUuidV7 } from '../../common/uuid';
 import { bookingWindowError } from './booking-rules';
 import { BookingsRepository, type BookingRecord } from './bookings.repository';
@@ -105,25 +106,8 @@ export class BookingsService {
       });
     }
 
-    const dayOfWeek = new Date(`${localDate(start)}T12:00:00+07:00`).getUTCDay();
-    const hours = await this.repository.findOperatingHours(court.venueId, dayOfWeek);
+    const dayOfWeek = dayOfWeekFromDate(new Date(`${localDate(start)}T12:00:00+07:00`));
     const startMinutes = minutesInVietnam(start);
-    const endMinutes = minutesInVietnam(end);
-    const openMinutes = clockToMinutes(hours?.openTime ?? null);
-    const closeMinutes = clockToMinutes(hours?.closeTime ?? null);
-    if (
-      !hours ||
-      hours.isClosed ||
-      openMinutes === null ||
-      closeMinutes === null ||
-      startMinutes < openMinutes ||
-      endMinutes > closeMinutes
-    ) {
-      throw new BadRequestException({
-        code: ErrorCode.BOOKING_OUTSIDE_OPERATING_HOURS,
-        message: 'Booking is outside venue operating hours',
-      });
-    }
 
     const isGuest = !user;
     const contactPhone = normalizePhone(dto.contactPhone ?? user?.phone ?? '');
@@ -140,7 +124,7 @@ export class BookingsService {
       });
     }
 
-    const pricingRules = await this.repository.findPricingRules(court.venueId);
+    const pricingRules = await this.repository.findPricingRules(court.venueId, dayOfWeek);
     if (!pricingRules.length) {
       throw new BadRequestException({
         code: ErrorCode.BOOKING_NO_PRICING_RULE,

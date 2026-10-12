@@ -20,7 +20,6 @@ import {
   CreateVenueDto,
   CreateVenuePricingRuleDto,
   ListVenueDto,
-  SetOperatingHoursDto,
   SetVenuePricingRulesDto,
   UpdateCourtDto,
 } from './dto/venue.dto';
@@ -92,16 +91,6 @@ export class PartnerVenuesController {
     @Body() dto: UpdateCourtDto,
   ) {
     return this.venues.updateCourt(user.userId, courtId, dto);
-  }
-
-  @Put(':venueId/hours/:dayOfWeek')
-  setHours(
-    @CurrentUser() user: AuthUser,
-    @Param('venueId') venueId: string,
-    @Param('dayOfWeek') dayOfWeek: string,
-    @Body() dto: SetOperatingHoursDto,
-  ) {
-    return this.venues.setOperatingHours(user.userId, venueId, Number(dayOfWeek), dto);
   }
 
   @Get(':venueId/pricing-rules')

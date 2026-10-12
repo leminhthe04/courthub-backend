@@ -11,9 +11,9 @@ import {
   CreateVenueDto,
   CreateVenuePricingRuleDto,
   ListVenueDto,
-  SetOperatingHoursDto,
   UpdateCourtDto,
 } from './dto/venue.dto';
+import type { DayOfWeek } from '../../database/schema';
 import { VenuesRepository, type VenueRecord } from './venues.repository';
 
 const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
@@ -45,12 +45,21 @@ function nextDate(value: Date) {
   return new Date(value.getTime() + 24 * 60 * 60 * 1000);
 }
 
-function vietnamDayOfWeek(value: Date) {
+export function vietnamDayOfWeek(value: Date): DayOfWeek {
   const weekday = new Intl.DateTimeFormat('en-US', {
     timeZone: VIETNAM_TIME_ZONE,
     weekday: 'short',
   }).format(value);
-  return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(weekday);
+  const values: Record<string, DayOfWeek> = {
+    Mon: 'MON',
+    Tue: 'TUE',
+    Wed: 'WED',
+    Thu: 'THU',
+    Fri: 'FRI',
+    Sat: 'SAT',
+    Sun: 'SUN',
+  };
+  return values[weekday];
 }
 
 @Injectable()
@@ -73,22 +82,28 @@ export class VenuesService {
   }
 
   async getVenueAggregate(venue: VenueRecord) {
-    const [venueCourts, hours, pricingRules] = await Promise.all([
+    const [venueCourts, pricingRules] = await Promise.all([
       this.repository.listCourts(venue.id),
-      this.repository.listOperatingHours(venue.id),
       this.repository.listPricingRules(venue.id),
     ]);
-    return { ...venue, courts: venueCourts, operatingHours: hours, pricingRules };
+    return { ...venue, courts: venueCourts, pricingRules };
   }
 
   async getSchedule(id: string, date: string, currentUserId?: string) {
-    const venue = await this.getPublic(id);
+    let venue: Awaited<ReturnType<typeof this.getVenueAggregate>> | undefined;
+    if (currentUserId) {
+      const owned = await this.repository.findVenueWithCategory(id);
+      if (owned && (owned.ownerId === currentUserId || owned.status === 'APPROVED')) {
+        venue = await this.getVenueAggregate(owned);
+      }
+    }
+    if (!venue) {
+      venue = await this.getPublic(id);
+    }
     const dayStart = startOfVietnamDate(date);
     const dayEnd = nextDate(dayStart);
-    const day = vietnamDayOfWeek(dayStart);
     const activeCourts = venue.courts.filter((court) => court.isActive);
     const courtIds = activeCourts.map((court) => court.id);
-    const dayHours = venue.operatingHours.find((item) => item.dayOfWeek === day) ?? null;
 
     if (!courtIds.length) {
       return {
@@ -96,7 +111,6 @@ export class VenuesService {
         date,
         timezone: VIETNAM_TIME_ZONE,
         slotMinutes: 30,
-        hours: dayHours,
         courts: [],
       };
     }
@@ -107,7 +121,6 @@ export class VenuesService {
       date,
       timezone: VIETNAM_TIME_ZONE,
       slotMinutes: 30,
-      hours: dayHours,
       courts: activeCourts.map((court) => ({
         ...court,
         bookings: scheduleBookings
@@ -166,51 +179,6 @@ export class VenuesService {
     return this.repository.updateCourt(courtId, { ...dto, updatedAt: new Date() });
   }
 
-  async setOperatingHours(
-    ownerId: string,
-    venueId: string,
-    dayOfWeek: number,
-    dto: SetOperatingHoursDto,
-  ) {
-    await this.requireOwnedVenue(ownerId, venueId);
-    if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
-      throw new BadRequestException({
-        code: ErrorCode.VENUE_DAY_OF_WEEK_INVALID,
-        message: 'dayOfWeek must be between 0 and 6',
-      });
-    }
-
-    const aligned = (value?: string) => Boolean(value && Number(value.slice(3, 5)) % 30 === 0);
-    if (
-      !dto.isClosed &&
-      (!dto.openTime ||
-        !dto.closeTime ||
-        dto.openTime >= dto.closeTime ||
-        !aligned(dto.openTime) ||
-        !aligned(dto.closeTime))
-    ) {
-      throw new BadRequestException({
-        code: ErrorCode.VENUE_INVALID_OPERATING_HOURS,
-        message: 'Operating hours must use valid 30-minute boundaries',
-      });
-    }
-
-    const values = {
-      isClosed: dto.isClosed,
-      openTime: dto.isClosed ? null : dto.openTime,
-      closeTime: dto.isClosed ? null : dto.closeTime,
-    };
-    const existing = await this.repository.findOperatingHours(venueId, dayOfWeek);
-    if (existing) return this.repository.updateOperatingHours(existing.id, values);
-
-    return this.repository.createOperatingHours({
-      id: createUuidV7(),
-      venueId,
-      dayOfWeek,
-      ...values,
-    });
-  }
-
   async listPricingRules(venueId: string) {
     return this.repository.listPricingRules(venueId);
   }
@@ -228,6 +196,7 @@ export class VenuesService {
 
     const existingRules = await this.repository.listPricingRules(venueId);
     for (const rule of existingRules) {
+      if (rule.dayOfWeek !== dto.dayOfWeek) continue;
       const existingStart = clockToMinutes(rule.startTime)!;
       const existingEnd = clockToMinutes(rule.endTime)!;
       if (Math.max(startMin, existingStart) < Math.min(endMin, existingEnd)) {
@@ -241,6 +210,7 @@ export class VenuesService {
     return this.repository.createPricingRule({
       id: createUuidV7(),
       venueId,
+      dayOfWeek: dto.dayOfWeek,
       startTime: dto.startTime,
       endTime: dto.endTime,
       hourlyRate: dto.hourlyRate,
@@ -276,13 +246,21 @@ export class VenuesService {
       }
     }
 
-    parsed.sort((a, b) => a.startMin - b.endMin);
-    for (let i = 0; i < parsed.length - 1; i++) {
-      if (parsed[i].endMin > parsed[i + 1].startMin) {
-        throw new BadRequestException({
-          code: ErrorCode.VENUE_INVALID_PRICING_RULE,
-          message: 'Pricing rules cannot overlap',
-        });
+    const grouped = new Map<DayOfWeek, typeof parsed>();
+    for (const rule of parsed) {
+      const group = grouped.get(rule.dayOfWeek) ?? [];
+      group.push(rule);
+      grouped.set(rule.dayOfWeek, group);
+    }
+    for (const group of grouped.values()) {
+      group.sort((a, b) => a.startMin - b.startMin);
+      for (let i = 0; i < group.length - 1; i++) {
+        if (group[i].endMin > group[i + 1].startMin) {
+          throw new BadRequestException({
+            code: ErrorCode.VENUE_INVALID_PRICING_RULE,
+            message: 'Pricing rules cannot overlap on the same day',
+          });
+        }
       }
     }
 
@@ -290,6 +268,7 @@ export class VenuesService {
       venueId,
       parsed.map((r) => ({
         id: createUuidV7(),
+        dayOfWeek: r.dayOfWeek,
         startTime: r.startTime,
         endTime: r.endTime,
         hourlyRate: r.hourlyRate,
