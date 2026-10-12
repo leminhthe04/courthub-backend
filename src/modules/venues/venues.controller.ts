@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentUser } from '../../common/current-user.decorator';
 import type { AuthUser } from '../../common/auth.types';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from '../../common/jwt-auth.guard';
@@ -7,8 +18,9 @@ import { RolesGuard } from '../../common/roles.guard';
 import {
   CreateCourtDto,
   CreateVenueDto,
+  CreateVenuePricingRuleDto,
   ListVenueDto,
-  SetOperatingHoursDto,
+  SetVenuePricingRulesDto,
   UpdateCourtDto,
 } from './dto/venue.dto';
 import { VenuesService } from './venues.service';
@@ -81,13 +93,35 @@ export class PartnerVenuesController {
     return this.venues.updateCourt(user.userId, courtId, dto);
   }
 
-  @Put(':venueId/hours/:dayOfWeek')
-  setHours(
+  @Get(':venueId/pricing-rules')
+  listPricingRules(@Param('venueId') venueId: string) {
+    return this.venues.listPricingRules(venueId);
+  }
+
+  @Post(':venueId/pricing-rules')
+  createPricingRule(
     @CurrentUser() user: AuthUser,
     @Param('venueId') venueId: string,
-    @Param('dayOfWeek') dayOfWeek: string,
-    @Body() dto: SetOperatingHoursDto,
+    @Body() dto: CreateVenuePricingRuleDto,
   ) {
-    return this.venues.setOperatingHours(user.userId, venueId, Number(dayOfWeek), dto);
+    return this.venues.createPricingRule(user.userId, venueId, dto);
+  }
+
+  @Delete(':venueId/pricing-rules/:ruleId')
+  deletePricingRule(
+    @CurrentUser() user: AuthUser,
+    @Param('venueId') venueId: string,
+    @Param('ruleId') ruleId: string,
+  ) {
+    return this.venues.deletePricingRule(user.userId, venueId, ruleId);
+  }
+
+  @Put(':venueId/pricing-rules')
+  setPricingRules(
+    @CurrentUser() user: AuthUser,
+    @Param('venueId') venueId: string,
+    @Body() dto: SetVenuePricingRulesDto,
+  ) {
+    return this.venues.setPricingRules(user.userId, venueId, dto.rules);
   }
 }

@@ -30,3 +30,27 @@ export class LoginDto {
   @MinLength(8)
   password!: string;
 }
+
+export class UpdateProfileDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  fullName?: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @Matches(phonePattern, { message: 'phone must be a valid phone number' })
+  phone?: string;
+}
+
+export class ChangePasswordDto {
+  @IsString()
+  currentPassword!: string;
+
+  @IsString()
+  @MinLength(8)
+  newPassword!: string;
+}

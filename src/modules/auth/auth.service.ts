@@ -1,12 +1,17 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { compare, hash } from 'bcryptjs';
 import type { AuthUser, JwtPayload } from '../../common/auth.types';
 import { ErrorCode } from '../../common/error-codes';
 import { createUuidV7 } from '../../common/uuid';
 import { AuthRepository, type AuthUserRecord } from './auth.repository';
-import { LoginDto, RegisterDto } from './dto/auth.dto';
+import { ChangePasswordDto, LoginDto, RegisterDto, UpdateProfileDto } from './dto/auth.dto';
 
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -126,6 +131,72 @@ export class AuthService {
       });
     }
     return this.sanitize(user);
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const user = await this.repository.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException({
+        code: ErrorCode.AUTH_ACCOUNT_NOT_FOUND,
+        message: 'Account does not exist',
+      });
+    }
+
+    const email = dto.email !== undefined ? dto.email.trim().toLowerCase() || null : user.email;
+    const phone = dto.phone !== undefined ? dto.phone.replace(/[\s().-]/g, '') || null : user.phone;
+    const fullName = dto.fullName !== undefined ? dto.fullName.trim() : user.fullName;
+
+    if (!email && !phone) {
+      throw new ConflictException({
+        code: ErrorCode.AUTH_CONTACT_REQUIRED,
+        message: 'Email or phone is required',
+      });
+    }
+
+    const duplicate = await this.repository.findByContactExcludingUser(userId, email, phone);
+    if (duplicate) {
+      throw new ConflictException({
+        code: ErrorCode.AUTH_CONTACT_ALREADY_EXISTS,
+        message: 'Email or phone is already in use by another account',
+      });
+    }
+
+    const updated = await this.repository.updateUser(userId, {
+      fullName,
+      email,
+      phone,
+    });
+
+    return this.sanitize(updated);
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.repository.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException({
+        code: ErrorCode.AUTH_ACCOUNT_NOT_FOUND,
+        message: 'Account does not exist',
+      });
+    }
+
+    if (!dto.currentPassword || !(await compare(dto.currentPassword, user.passwordHash))) {
+      throw new UnauthorizedException({
+        code: ErrorCode.AUTH_INVALID_CURRENT_PASSWORD,
+        message: 'Current password is incorrect',
+      });
+    }
+
+    if (!dto.newPassword || dto.newPassword.length < 8) {
+      throw new BadRequestException({
+        code: ErrorCode.AUTH_PASSWORD_TOO_SHORT,
+        message: 'New password must be at least 8 characters',
+      });
+    }
+
+    const passwordHash = await hash(dto.newPassword, 12);
+    await this.repository.updateUser(userId, { passwordHash });
+
+    return { ok: true };
   }
 
   private sanitize(user: AuthUserRecord): AuthUser {

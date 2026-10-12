@@ -1,12 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import { DATABASE, type Database } from '../../database/database.module';
 import {
   bookings,
   courts,
-  operatingHours,
+  venuePricingRules,
   venues,
   type Booking,
+  type DayOfWeek,
   type NewBooking,
 } from '../../database/schema';
 
@@ -22,7 +23,6 @@ export class BookingsRepository {
       .select({
         id: courts.id,
         venueId: venues.id,
-        hourlyRate: courts.hourlyRate,
         courtActive: courts.isActive,
         venueStatus: venues.status,
       })
@@ -33,13 +33,14 @@ export class BookingsRepository {
     return court;
   }
 
-  async findOperatingHours(venueId: string, dayOfWeek: number) {
-    const [hours] = await this.db
+  async findPricingRules(venueId: string, dayOfWeek: DayOfWeek) {
+    return this.db
       .select()
-      .from(operatingHours)
-      .where(and(eq(operatingHours.venueId, venueId), eq(operatingHours.dayOfWeek, dayOfWeek)))
-      .limit(1);
-    return hours;
+      .from(venuePricingRules)
+      .where(
+        and(eq(venuePricingRules.venueId, venueId), eq(venuePricingRules.dayOfWeek, dayOfWeek)),
+      )
+      .orderBy(asc(venuePricingRules.startTime));
   }
 
   async create(values: NewBooking): Promise<BookingRecord> {

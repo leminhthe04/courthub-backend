@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto } from './dto/auth.dto';
+import { ChangePasswordDto, LoginDto, RegisterDto, UpdateProfileDto } from './dto/auth.dto';
 import { CurrentUser } from '../../common/current-user.decorator';
 import type { AuthUser } from '../../common/auth.types';
 import { JwtAuthGuard } from '../../common/jwt-auth.guard';
@@ -64,6 +64,19 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async me(@CurrentUser() user: AuthUser) {
     return { user: await this.auth.getMe(user.userId) };
+  }
+
+  @Patch('profile')
+  @UseGuards(JwtAuthGuard)
+  async updateProfile(@CurrentUser() user: AuthUser, @Body() dto: UpdateProfileDto) {
+    const updated = await this.auth.updateProfile(user.userId, dto);
+    return { user: updated };
+  }
+
+  @Patch('password')
+  @UseGuards(JwtAuthGuard)
+  async changePassword(@CurrentUser() user: AuthUser, @Body() dto: ChangePasswordDto) {
+    return this.auth.changePassword(user.userId, dto);
   }
 
   private setAuthCookies(
