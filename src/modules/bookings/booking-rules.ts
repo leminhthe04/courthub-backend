@@ -1,3 +1,5 @@
+import { ErrorCode } from '../../common/error-codes';
+
 const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
 // Booking slots are aligned to 30-minute boundaries in Vietnam time.
@@ -18,18 +20,32 @@ function minutesInVietnam(value: Date) {
   return hour * 60 + minute;
 }
 
-export function bookingWindowError(start: Date, end: Date): string | null {
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()))
-    return 'Khoảng thời gian không hợp lệ';
-  if (start >= end || localDate(start) !== localDate(end))
-    return 'Booking phải nằm trong cùng một ngày';
+export function bookingWindowError(
+  start: Date,
+  end: Date,
+): { code: ErrorCode; message: string } | null {
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return {
+      code: ErrorCode.BOOKING_INVALID_TIME_WINDOW,
+      message: 'Khoảng thời gian không hợp lệ',
+    };
+  }
+  if (start >= end || localDate(start) !== localDate(end)) {
+    return {
+      code: ErrorCode.BOOKING_SAME_DAY_REQUIRED,
+      message: 'Booking phải nằm trong cùng một ngày',
+    };
+  }
   const durationMinutes = (end.getTime() - start.getTime()) / 60000;
   if (
     minutesInVietnam(start) % 30 !== 0 ||
     minutesInVietnam(end) % 30 !== 0 ||
     durationMinutes % 30 !== 0
   ) {
-    return 'Thời gian phải nằm trên mốc 30 phút';
+    return {
+      code: ErrorCode.BOOKING_SLOT_ALIGNMENT_REQUIRED,
+      message: 'Thời gian phải nằm trên mốc 30 phút',
+    };
   }
   return null;
 }

@@ -23,6 +23,12 @@ export const bookingStatusEnum = pgEnum('booking_status', [
   'CANCELLED',
   'REJECTED',
 ]);
+export const sessionRevokeReasonEnum = pgEnum('session_revoke_reason', [
+  'LOGOUT',
+  'ROTATED',
+  'EXPIRED',
+  'REVOKED_BY_ADMIN',
+]);
 
 export const users = pgTable(
   'users',
@@ -121,6 +127,30 @@ export const bookings = pgTable(
   ],
 );
 
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: uuid('id').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    refreshTokenHash: text('refresh_token_hash').notNull(),
+    userAgent: text('user_agent'),
+    ipAddress: varchar('ip_address', { length: 45 }),
+    isRevoked: boolean('is_revoked').notNull().default(false),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    revokedReason: sessionRevokeReasonEnum('revoked_reason'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('sessions_user_id_idx').on(table.userId),
+    index('sessions_expires_at_idx').on(table.expiresAt),
+    index('sessions_token_hash_idx').on(table.refreshTokenHash),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Venue = typeof venues.$inferSelect;
@@ -131,5 +161,8 @@ export type OperatingHours = typeof operatingHours.$inferSelect;
 export type NewOperatingHours = typeof operatingHours.$inferInsert;
 export type Booking = typeof bookings.$inferSelect;
 export type NewBooking = typeof bookings.$inferInsert;
+export type Session = typeof sessions.$inferSelect;
+export type NewSession = typeof sessions.$inferInsert;
 export type UserRole = 'CUSTOMER' | 'PARTNER' | 'ADMIN';
 export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'REJECTED';
+export type SessionRevokeReason = 'LOGOUT' | 'ROTATED' | 'EXPIRED' | 'REVOKED_BY_ADMIN';

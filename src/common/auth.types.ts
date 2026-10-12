@@ -13,4 +13,5 @@ export type JwtPayload = {
   role: UserRole;
   email: string | null;
   phone: string | null;
+  sid?: string;
 };

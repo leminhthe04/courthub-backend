@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ErrorCode } from '../../common/error-codes';
 import { createUuidV7 } from '../../common/uuid';
 import {
   CreateCourtDto,
@@ -17,9 +18,19 @@ import { VenuesRepository, type VenueRecord } from './venues.repository';
 const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
 export function startOfVietnamDate(date: string): Date {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new BadRequestException('date must use YYYY-MM-DD');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new BadRequestException({
+      code: ErrorCode.VENUE_INVALID_DATE_FORMAT,
+      message: 'date must use YYYY-MM-DD',
+    });
+  }
   const parsed = new Date(`${date}T00:00:00+07:00`);
-  if (Number.isNaN(parsed.getTime())) throw new BadRequestException('Invalid date');
+  if (Number.isNaN(parsed.getTime())) {
+    throw new BadRequestException({
+      code: ErrorCode.VENUE_INVALID_DATE,
+      message: 'Invalid date',
+    });
+  }
   return parsed;
 }
 
@@ -45,7 +56,12 @@ export class VenuesService {
 
   async getPublic(id: string) {
     const venue = await this.repository.findPublic(id);
-    if (!venue) throw new NotFoundException('Venue not found or not approved');
+    if (!venue) {
+      throw new NotFoundException({
+        code: ErrorCode.VENUE_NOT_FOUND,
+        message: 'Venue not found or not approved',
+      });
+    }
     return this.getVenueAggregate(venue);
   }
 
@@ -127,8 +143,18 @@ export class VenuesService {
 
   async updateCourt(ownerId: string, courtId: string, dto: UpdateCourtDto) {
     const row = await this.repository.findCourtWithOwner(courtId);
-    if (!row) throw new NotFoundException('Court not found');
-    if (row.ownerId !== ownerId) throw new ForbiddenException('You do not own this court');
+    if (!row) {
+      throw new NotFoundException({
+        code: ErrorCode.BOOKING_COURT_NOT_FOUND,
+        message: 'Court not found',
+      });
+    }
+    if (row.ownerId !== ownerId) {
+      throw new ForbiddenException({
+        code: ErrorCode.VENUE_FORBIDDEN,
+        message: 'You do not own this court',
+      });
+    }
     return this.repository.updateCourt(courtId, { ...dto, updatedAt: new Date() });
   }
 
@@ -140,7 +166,10 @@ export class VenuesService {
   ) {
     await this.requireOwnedVenue(ownerId, venueId);
     if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
-      throw new BadRequestException('dayOfWeek must be between 0 and 6');
+      throw new BadRequestException({
+        code: ErrorCode.VENUE_DAY_OF_WEEK_INVALID,
+        message: 'dayOfWeek must be between 0 and 6',
+      });
     }
 
     const aligned = (value?: string) => Boolean(value && Number(value.slice(3, 5)) % 30 === 0);
@@ -152,7 +181,10 @@ export class VenuesService {
         !aligned(dto.openTime) ||
         !aligned(dto.closeTime))
     ) {
-      throw new BadRequestException('Operating hours must use valid 30-minute boundaries');
+      throw new BadRequestException({
+        code: ErrorCode.VENUE_INVALID_OPERATING_HOURS,
+        message: 'Operating hours must use valid 30-minute boundaries',
+      });
     }
 
     const values = {
@@ -177,13 +209,23 @@ export class VenuesService {
 
   async reviewVenue(id: string, status: 'APPROVED' | 'REJECTED') {
     const venue = await this.repository.reviewVenue(id, status);
-    if (!venue) throw new NotFoundException('Venue not found');
+    if (!venue) {
+      throw new NotFoundException({
+        code: ErrorCode.VENUE_NOT_FOUND,
+        message: 'Venue not found',
+      });
+    }
     return venue;
   }
 
   private async requireOwnedVenue(ownerId: string, id: string) {
     const venue = await this.repository.findOwnedVenue(ownerId, id);
-    if (!venue) throw new ForbiddenException('You do not own this venue');
+    if (!venue) {
+      throw new ForbiddenException({
+        code: ErrorCode.VENUE_FORBIDDEN,
+        message: 'You do not own this venue',
+      });
+    }
     return venue;
   }
 }
