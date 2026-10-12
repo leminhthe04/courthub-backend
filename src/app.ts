@@ -4,6 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { GlobalHttpExceptionFilter } from './common/http-exception.filter';
 import { EnvConfig } from './config/env-config';
 
 async function bootstrap() {
@@ -18,6 +19,7 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
   );
+  app.useGlobalFilters(new GlobalHttpExceptionFilter());
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('CourtHub API')

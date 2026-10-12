@@ -17,7 +17,7 @@ import { EnvConfig } from '../../config/env-config';
       inject: [EnvConfig],
       useFactory: (config: EnvConfig) => ({
         secret: config.jwtSecret,
-        signOptions: { expiresIn: '1d' },
+        signOptions: { expiresIn: '15m' },
       }),
     }),
   ],

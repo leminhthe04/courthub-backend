@@ -1,7 +1,6 @@
 import {
   boolean,
   index,
-  integer,
   numeric,
   pgEnum,
   pgTable,
@@ -23,6 +22,12 @@ export const bookingStatusEnum = pgEnum('booking_status', [
   'CANCELLED',
   'REJECTED',
 ]);
+export const sessionRevokeReasonEnum = pgEnum('session_revoke_reason', [
+  'LOGOUT',
+  'ROTATED',
+  'EXPIRED',
+  'REVOKED_BY_ADMIN',
+]);
 
 export const users = pgTable(
   'users',
@@ -42,6 +47,22 @@ export const users = pgTable(
   ],
 );
 
+export const categories = pgTable(
+  'categories',
+  {
+    id: uuid('id').primaryKey(),
+    name: varchar('name', { length: 100 }).notNull(),
+    slug: varchar('slug', { length: 100 }).notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('categories_slug_unique').on(table.slug),
+    index('categories_is_active_idx').on(table.isActive),
+  ],
+);
+
 export const venues = pgTable(
   'venues',
   {
@@ -49,8 +70,10 @@ export const venues = pgTable(
     ownerId: uuid('owner_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    categoryId: uuid('category_id')
+      .notNull()
+      .references(() => categories.id, { onDelete: 'restrict' }),
     name: varchar('name', { length: 160 }).notNull(),
-    sportType: varchar('sport_type', { length: 60 }).notNull(),
     address: varchar('address', { length: 255 }).notNull(),
     city: varchar('city', { length: 100 }).notNull(),
     description: text('description'),
@@ -61,6 +84,7 @@ export const venues = pgTable(
   },
   (table) => [
     index('venues_owner_id_idx').on(table.ownerId),
+    index('venues_category_id_idx').on(table.categoryId),
     index('venues_search_idx').on(table.status, table.city),
   ],
 );
@@ -73,7 +97,6 @@ export const courts = pgTable(
       .notNull()
       .references(() => venues.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 100 }).notNull(),
-    hourlyRate: numeric('hourly_rate', { precision: 12, scale: 2, mode: 'number' }).notNull(),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -81,19 +104,33 @@ export const courts = pgTable(
   (table) => [index('courts_venue_id_idx').on(table.venueId)],
 );
 
-export const operatingHours = pgTable(
-  'operating_hours',
+export const dayOfWeekEnum = pgEnum('day_of_week', [
+  'MON',
+  'TUE',
+  'WED',
+  'THU',
+  'FRI',
+  'SAT',
+  'SUN',
+]);
+
+export const venuePricingRules = pgTable(
+  'venue_pricing_rules',
   {
     id: uuid('id').primaryKey(),
     venueId: uuid('venue_id')
       .notNull()
       .references(() => venues.id, { onDelete: 'cascade' }),
-    dayOfWeek: integer('day_of_week').notNull(),
-    openTime: time('open_time'),
-    closeTime: time('close_time'),
-    isClosed: boolean('is_closed').notNull().default(false),
+    dayOfWeek: dayOfWeekEnum('day_of_week').notNull(),
+    startTime: time('start_time').notNull(),
+    endTime: time('end_time').notNull(),
+    hourlyRate: numeric('hourly_rate', { precision: 12, scale: 2, mode: 'number' }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [uniqueIndex('operating_hours_venue_day_unique').on(table.venueId, table.dayOfWeek)],
+  (table) => [
+    index('venue_pricing_rules_venue_day_idx').on(table.venueId, table.dayOfWeek, table.startTime),
+  ],
 );
 
 export const bookings = pgTable(
@@ -121,15 +158,45 @@ export const bookings = pgTable(
   ],
 );
 
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: uuid('id').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    refreshTokenHash: text('refresh_token_hash').notNull(),
+    userAgent: text('user_agent'),
+    ipAddress: varchar('ip_address', { length: 45 }),
+    isRevoked: boolean('is_revoked').notNull().default(false),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    revokedReason: sessionRevokeReasonEnum('revoked_reason'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('sessions_user_id_idx').on(table.userId),
+    index('sessions_expires_at_idx').on(table.expiresAt),
+    index('sessions_token_hash_idx').on(table.refreshTokenHash),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
+export type Category = typeof categories.$inferSelect;
+export type NewCategory = typeof categories.$inferInsert;
 export type Venue = typeof venues.$inferSelect;
 export type NewVenue = typeof venues.$inferInsert;
 export type Court = typeof courts.$inferSelect;
 export type NewCourt = typeof courts.$inferInsert;
-export type OperatingHours = typeof operatingHours.$inferSelect;
-export type NewOperatingHours = typeof operatingHours.$inferInsert;
+export type VenuePricingRule = typeof venuePricingRules.$inferSelect;
+export type NewVenuePricingRule = typeof venuePricingRules.$inferInsert;
 export type Booking = typeof bookings.$inferSelect;
 export type NewBooking = typeof bookings.$inferInsert;
+export type Session = typeof sessions.$inferSelect;
+export type NewSession = typeof sessions.$inferInsert;
 export type UserRole = 'CUSTOMER' | 'PARTNER' | 'ADMIN';
 export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'REJECTED';
+export type SessionRevokeReason = 'LOGOUT' | 'ROTATED' | 'EXPIRED' | 'REVOKED_BY_ADMIN';
+export type DayOfWeek = (typeof dayOfWeekEnum.enumValues)[number];

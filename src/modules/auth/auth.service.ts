@@ -1,10 +1,19 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { createHash, randomBytes } from 'node:crypto';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { compare, hash } from 'bcryptjs';
 import type { AuthUser, JwtPayload } from '../../common/auth.types';
+import { ErrorCode } from '../../common/error-codes';
 import { createUuidV7 } from '../../common/uuid';
 import { AuthRepository, type AuthUserRecord } from './auth.repository';
-import { LoginDto, RegisterDto } from './dto/auth.dto';
+import { ChangePasswordDto, LoginDto, RegisterDto, UpdateProfileDto } from './dto/auth.dto';
+
+const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 @Injectable()
 export class AuthService {
@@ -13,15 +22,23 @@ export class AuthService {
     private readonly jwt: JwtService,
   ) {}
 
-  async register(dto: RegisterDto) {
+  async register(dto: RegisterDto, userAgent?: string, ipAddress?: string) {
     const email = dto.email?.trim().toLowerCase() || null;
     const phone = dto.phone?.replace(/[\s().-]/g, '') || null;
     if (!email && !phone) {
-      throw new ConflictException('Email or phone is required');
+      throw new ConflictException({
+        code: ErrorCode.AUTH_CONTACT_REQUIRED,
+        message: 'Email or phone is required',
+      });
     }
 
     const duplicate = await this.repository.findByContact(email, phone);
-    if (duplicate) throw new ConflictException('Email or phone is already in use');
+    if (duplicate) {
+      throw new ConflictException({
+        code: ErrorCode.AUTH_CONTACT_ALREADY_EXISTS,
+        message: 'Email or phone is already in use',
+      });
+    }
 
     const user = await this.repository.createCustomer({
       id: createUuidV7(),
@@ -32,22 +49,154 @@ export class AuthService {
       role: 'CUSTOMER',
     });
 
-    return this.issueSession(user);
+    return this.issueSession(user, userAgent, ipAddress);
   }
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto, userAgent?: string, ipAddress?: string) {
     const user = await this.repository.findByIdentifier(dto.identifier.trim());
     if (!user || !(await compare(dto.password, user.passwordHash))) {
-      throw new UnauthorizedException('Invalid login credentials');
+      throw new UnauthorizedException({
+        code: ErrorCode.AUTH_INVALID_CREDENTIALS,
+        message: 'Invalid login credentials',
+      });
     }
 
-    return this.issueSession(user);
+    return this.issueSession(user, userAgent, ipAddress);
+  }
+
+  async refresh(rawRefreshToken: string, userAgent?: string, ipAddress?: string) {
+    if (!rawRefreshToken) {
+      throw new UnauthorizedException({
+        code: ErrorCode.AUTH_INVALID_REFRESH_TOKEN,
+        message: 'Refresh token is required',
+      });
+    }
+
+    const hash = this.hashToken(rawRefreshToken);
+    const session = await this.repository.findSessionByHash(hash);
+
+    if (!session) {
+      throw new UnauthorizedException({
+        code: ErrorCode.AUTH_INVALID_REFRESH_TOKEN,
+        message: 'Invalid refresh token',
+      });
+    }
+
+    if (session.isRevoked) {
+      // Token reuse detection: revoked token was presented again
+      throw new UnauthorizedException({
+        code: ErrorCode.AUTH_SESSION_REVOKED,
+        message: 'Session has been revoked',
+      });
+    }
+
+    if (new Date() > new Date(session.expiresAt)) {
+      await this.repository.revokeSession(session.id, 'EXPIRED');
+      throw new UnauthorizedException({
+        code: ErrorCode.AUTH_SESSION_EXPIRED,
+        message: 'Session has expired',
+      });
+    }
+
+    const user = await this.repository.findById(session.userId);
+    if (!user) {
+      throw new UnauthorizedException({
+        code: ErrorCode.AUTH_ACCOUNT_NOT_FOUND,
+        message: 'Account does not exist',
+      });
+    }
+
+    // Token Rotation: invalidate previous session and issue new one
+    await this.repository.revokeSession(session.id, 'ROTATED');
+    return this.issueSession(user, userAgent, ipAddress);
+  }
+
+  async logout(rawRefreshToken?: string) {
+    if (rawRefreshToken) {
+      const hash = this.hashToken(rawRefreshToken);
+      const session = await this.repository.findSessionByHash(hash);
+      if (session && !session.isRevoked) {
+        await this.repository.revokeSession(session.id, 'LOGOUT');
+      }
+    }
+    return { ok: true };
   }
 
   async getMe(userId: string) {
     const user = await this.repository.findById(userId);
-    if (!user) throw new UnauthorizedException('Account does not exist');
+    if (!user) {
+      throw new UnauthorizedException({
+        code: ErrorCode.AUTH_ACCOUNT_NOT_FOUND,
+        message: 'Account does not exist',
+      });
+    }
     return this.sanitize(user);
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const user = await this.repository.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException({
+        code: ErrorCode.AUTH_ACCOUNT_NOT_FOUND,
+        message: 'Account does not exist',
+      });
+    }
+
+    const email = dto.email !== undefined ? dto.email.trim().toLowerCase() || null : user.email;
+    const phone = dto.phone !== undefined ? dto.phone.replace(/[\s().-]/g, '') || null : user.phone;
+    const fullName = dto.fullName !== undefined ? dto.fullName.trim() : user.fullName;
+
+    if (!email && !phone) {
+      throw new ConflictException({
+        code: ErrorCode.AUTH_CONTACT_REQUIRED,
+        message: 'Email or phone is required',
+      });
+    }
+
+    const duplicate = await this.repository.findByContactExcludingUser(userId, email, phone);
+    if (duplicate) {
+      throw new ConflictException({
+        code: ErrorCode.AUTH_CONTACT_ALREADY_EXISTS,
+        message: 'Email or phone is already in use by another account',
+      });
+    }
+
+    const updated = await this.repository.updateUser(userId, {
+      fullName,
+      email,
+      phone,
+    });
+
+    return this.sanitize(updated);
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.repository.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException({
+        code: ErrorCode.AUTH_ACCOUNT_NOT_FOUND,
+        message: 'Account does not exist',
+      });
+    }
+
+    if (!dto.currentPassword || !(await compare(dto.currentPassword, user.passwordHash))) {
+      throw new UnauthorizedException({
+        code: ErrorCode.AUTH_INVALID_CURRENT_PASSWORD,
+        message: 'Current password is incorrect',
+      });
+    }
+
+    if (!dto.newPassword || dto.newPassword.length < 8) {
+      throw new BadRequestException({
+        code: ErrorCode.AUTH_PASSWORD_TOO_SHORT,
+        message: 'New password must be at least 8 characters',
+      });
+    }
+
+    const passwordHash = await hash(dto.newPassword, 12);
+    await this.repository.updateUser(userId, { passwordHash });
+
+    return { ok: true };
   }
 
   private sanitize(user: AuthUserRecord): AuthUser {
@@ -60,14 +209,38 @@ export class AuthService {
     };
   }
 
-  private issueSession(user: AuthUserRecord) {
+  private async issueSession(user: AuthUserRecord, userAgent?: string, ipAddress?: string) {
     const safeUser = this.sanitize(user);
+    const sessionId = createUuidV7();
+    const rawRefreshToken = randomBytes(32).toString('hex');
+    const refreshTokenHash = this.hashToken(rawRefreshToken);
+    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+
+    await this.repository.createSession({
+      id: sessionId,
+      userId: user.id,
+      refreshTokenHash,
+      userAgent: userAgent ?? null,
+      ipAddress: ipAddress ?? null,
+      expiresAt,
+    });
+
     const payload: JwtPayload = {
       sub: safeUser.userId,
       role: safeUser.role,
       email: safeUser.email,
       phone: safeUser.phone,
+      sid: sessionId,
     };
-    return { user: safeUser, accessToken: this.jwt.sign(payload) };
+
+    return {
+      user: safeUser,
+      accessToken: this.jwt.sign(payload),
+      refreshToken: rawRefreshToken,
+    };
+  }
+
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
   }
 }
