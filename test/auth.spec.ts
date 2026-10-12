@@ -164,4 +164,81 @@ describe('AuthModule', () => {
     expect(result).toEqual({ ok: true });
     expect(mockRepo.revokeSession).toHaveBeenCalledWith('session-id-logout', 'LOGOUT');
   });
+
+  it('updates user profile successfully', async () => {
+    const mockUser: AuthUserRecord = {
+      id: 'user-profile-1',
+      fullName: 'Old Name',
+      email: 'old@example.com',
+      phone: '0901234567',
+      passwordHash: 'hashed',
+      role: 'CUSTOMER',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const updatedUser: AuthUserRecord = {
+      ...mockUser,
+      fullName: 'New Name',
+      email: 'new@example.com',
+      phone: '0909999999',
+    };
+
+    const mockRepo = {
+      findById: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue(mockUser),
+      findByContactExcludingUser: jest
+        .fn<(...args: any[]) => Promise<any>>()
+        .mockResolvedValue(undefined),
+      updateUser: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue(updatedUser),
+    } as unknown as AuthRepository;
+
+    const service = new AuthService(mockRepo, {} as JwtService);
+    const result = await service.updateProfile('user-profile-1', {
+      fullName: 'New Name',
+      email: 'new@example.com',
+      phone: '0909999999',
+    });
+
+    expect(result.fullName).toBe('New Name');
+    expect(result.email).toBe('new@example.com');
+    expect(mockRepo.updateUser).toHaveBeenCalledWith('user-profile-1', {
+      fullName: 'New Name',
+      email: 'new@example.com',
+      phone: '0909999999',
+    });
+  });
+
+  it('rejects duplicate contact when updating profile', async () => {
+    const mockUser: AuthUserRecord = {
+      id: 'user-profile-1',
+      fullName: 'Old Name',
+      email: 'old@example.com',
+      phone: '0901234567',
+      passwordHash: 'hashed',
+      role: 'CUSTOMER',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const anotherUser: AuthUserRecord = {
+      ...mockUser,
+      id: 'user-profile-2',
+      email: 'taken@example.com',
+    };
+
+    const mockRepo = {
+      findById: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue(mockUser),
+      findByContactExcludingUser: jest
+        .fn<(...args: any[]) => Promise<any>>()
+        .mockResolvedValue(anotherUser),
+    } as unknown as AuthRepository;
+
+    const service = new AuthService(mockRepo, {} as JwtService);
+
+    await expect(
+      service.updateProfile('user-profile-1', { email: 'taken@example.com' }),
+    ).rejects.toMatchObject({
+      response: { code: ErrorCode.AUTH_CONTACT_ALREADY_EXISTS },
+    });
+  });
 });

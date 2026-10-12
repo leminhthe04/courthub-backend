@@ -1,14 +1,18 @@
 import {
+  IsArray,
   IsBoolean,
   IsInt,
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 // Request contracts for venue and court endpoints.
 
@@ -22,18 +26,21 @@ export class ListVenueDto {
   city?: string;
 
   @IsOptional()
+  @IsUUID()
+  categoryId?: string;
+
+  @IsOptional()
   @IsString()
   sportType?: string;
 }
 
 export class CreateVenueDto {
+  @IsUUID()
+  categoryId!: string;
+
   @IsString()
   @MaxLength(160)
   name!: string;
-
-  @IsString()
-  @MaxLength(60)
-  sportType!: string;
 
   @IsString()
   @MaxLength(255)
@@ -56,10 +63,6 @@ export class CreateCourtDto {
   @IsString()
   @MaxLength(100)
   name!: string;
-
-  @IsNumber()
-  @Min(0)
-  hourlyRate!: number;
 }
 
 export class UpdateCourtDto {
@@ -69,13 +72,27 @@ export class UpdateCourtDto {
   name?: string;
 
   @IsOptional()
-  @IsNumber()
-  @Min(0)
-  hourlyRate?: number;
-
-  @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+}
+
+export class CreateVenuePricingRuleDto {
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'startTime must use HH:mm' })
+  startTime!: string;
+
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'endTime must use HH:mm' })
+  endTime!: string;
+
+  @IsNumber()
+  @Min(0)
+  hourlyRate!: number;
+}
+
+export class SetVenuePricingRulesDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateVenuePricingRuleDto)
+  rules!: CreateVenuePricingRuleDto[];
 }
 
 export class SetOperatingHoursDto {

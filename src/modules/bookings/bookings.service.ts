@@ -140,8 +140,35 @@ export class BookingsService {
       });
     }
 
+    const pricingRules = await this.repository.findPricingRules(court.venueId);
+    if (!pricingRules.length) {
+      throw new BadRequestException({
+        code: ErrorCode.BOOKING_NO_PRICING_RULE,
+        message: 'Venue has no pricing rules configured',
+      });
+    }
+
+    const slotCount = durationMinutes / 30;
+    let totalCost = 0;
+    for (let i = 0; i < slotCount; i++) {
+      const slotStart = startMinutes + i * 30;
+      const slotEnd = slotStart + 30;
+      const rule = pricingRules.find((r) => {
+        const rStart = clockToMinutes(r.startTime);
+        const rEnd = clockToMinutes(r.endTime);
+        return rStart !== null && rEnd !== null && rStart <= slotStart && slotEnd <= rEnd;
+      });
+      if (!rule) {
+        throw new BadRequestException({
+          code: ErrorCode.BOOKING_NO_PRICING_RULE,
+          message: 'No pricing rule configured for the requested time slot',
+        });
+      }
+      totalCost += Number(rule.hourlyRate) * 0.5;
+    }
+
     const guestToken = isGuest ? randomBytes(24).toString('hex') : null;
-    const totalAmount = Number((court.hourlyRate * (durationMinutes / 60)).toFixed(2));
+    const totalAmount = Number(totalCost.toFixed(2));
 
     try {
       const created = await this.repository.create({

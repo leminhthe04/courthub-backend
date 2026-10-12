@@ -9,6 +9,7 @@ import { createUuidV7 } from '../../common/uuid';
 import {
   CreateCourtDto,
   CreateVenueDto,
+  CreateVenuePricingRuleDto,
   ListVenueDto,
   SetOperatingHoursDto,
   UpdateCourtDto,
@@ -16,6 +17,12 @@ import {
 import { VenuesRepository, type VenueRecord } from './venues.repository';
 
 const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
+
+export function clockToMinutes(value: string | null) {
+  if (!value) return null;
+  const [hour, minute] = value.slice(0, 5).split(':').map(Number);
+  return hour * 60 + minute;
+}
 
 export function startOfVietnamDate(date: string): Date {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -66,11 +73,12 @@ export class VenuesService {
   }
 
   async getVenueAggregate(venue: VenueRecord) {
-    const [venueCourts, hours] = await Promise.all([
+    const [venueCourts, hours, pricingRules] = await Promise.all([
       this.repository.listCourts(venue.id),
       this.repository.listOperatingHours(venue.id),
+      this.repository.listPricingRules(venue.id),
     ]);
-    return { ...venue, courts: venueCourts, operatingHours: hours };
+    return { ...venue, courts: venueCourts, operatingHours: hours, pricingRules };
   }
 
   async getSchedule(id: string, date: string, currentUserId?: string) {
@@ -120,7 +128,7 @@ export class VenuesService {
       id: createUuidV7(),
       ...dto,
       ownerId,
-      status: 'PENDING',
+      status: 'APPROVED',
     });
     return this.getVenueAggregate(venue);
   }
@@ -201,6 +209,92 @@ export class VenuesService {
       dayOfWeek,
       ...values,
     });
+  }
+
+  async listPricingRules(venueId: string) {
+    return this.repository.listPricingRules(venueId);
+  }
+
+  async createPricingRule(ownerId: string, venueId: string, dto: CreateVenuePricingRuleDto) {
+    await this.requireOwnedVenue(ownerId, venueId);
+    const startMin = clockToMinutes(dto.startTime);
+    const endMin = clockToMinutes(dto.endTime);
+    if (startMin === null || endMin === null || startMin >= endMin) {
+      throw new BadRequestException({
+        code: ErrorCode.VENUE_INVALID_PRICING_RULE,
+        message: 'startTime must be earlier than endTime',
+      });
+    }
+
+    const existingRules = await this.repository.listPricingRules(venueId);
+    for (const rule of existingRules) {
+      const existingStart = clockToMinutes(rule.startTime)!;
+      const existingEnd = clockToMinutes(rule.endTime)!;
+      if (Math.max(startMin, existingStart) < Math.min(endMin, existingEnd)) {
+        throw new BadRequestException({
+          code: ErrorCode.VENUE_INVALID_PRICING_RULE,
+          message: 'Pricing rule overlaps with an existing rule',
+        });
+      }
+    }
+
+    return this.repository.createPricingRule({
+      id: createUuidV7(),
+      venueId,
+      startTime: dto.startTime,
+      endTime: dto.endTime,
+      hourlyRate: dto.hourlyRate,
+    });
+  }
+
+  async deletePricingRule(ownerId: string, venueId: string, ruleId: string) {
+    await this.requireOwnedVenue(ownerId, venueId);
+    const deleted = await this.repository.deletePricingRule(ruleId, venueId);
+    if (!deleted) {
+      throw new NotFoundException({
+        code: ErrorCode.VENUE_INVALID_PRICING_RULE,
+        message: 'Pricing rule not found',
+      });
+    }
+    return deleted;
+  }
+
+  async setPricingRules(ownerId: string, venueId: string, rules: CreateVenuePricingRuleDto[]) {
+    await this.requireOwnedVenue(ownerId, venueId);
+    const parsed = rules.map((r) => ({
+      ...r,
+      startMin: clockToMinutes(r.startTime)!,
+      endMin: clockToMinutes(r.endTime)!,
+    }));
+
+    for (const r of parsed) {
+      if (r.startMin === null || r.endMin === null || r.startMin >= r.endMin) {
+        throw new BadRequestException({
+          code: ErrorCode.VENUE_INVALID_PRICING_RULE,
+          message: 'Each rule must have startTime before endTime',
+        });
+      }
+    }
+
+    parsed.sort((a, b) => a.startMin - b.endMin);
+    for (let i = 0; i < parsed.length - 1; i++) {
+      if (parsed[i].endMin > parsed[i + 1].startMin) {
+        throw new BadRequestException({
+          code: ErrorCode.VENUE_INVALID_PRICING_RULE,
+          message: 'Pricing rules cannot overlap',
+        });
+      }
+    }
+
+    return this.repository.setPricingRules(
+      venueId,
+      parsed.map((r) => ({
+        id: createUuidV7(),
+        startTime: r.startTime,
+        endTime: r.endTime,
+        hourlyRate: r.hourlyRate,
+      })),
+    );
   }
 
   listForAdmin() {

@@ -3,30 +3,70 @@ import { and, asc, desc, eq, gt, ilike, inArray, lt, or, type SQL } from 'drizzl
 import { DATABASE, type Database } from '../../database/database.module';
 import {
   bookings,
+  categories,
   courts,
   operatingHours,
+  venuePricingRules,
   venues,
   type NewCourt,
   type NewOperatingHours,
   type NewVenue,
+  type NewVenuePricingRule,
 } from '../../database/schema';
 
-export type VenueRecord = typeof venues.$inferSelect;
+export type VenueRecord = typeof venues.$inferSelect & {
+  sportType: string;
+  categoryName: string;
+  categorySlug: string;
+};
 export type CourtRecord = typeof courts.$inferSelect;
 export type OperatingHoursRecord = typeof operatingHours.$inferSelect;
+export type VenuePricingRuleRecord = typeof venuePricingRules.$inferSelect;
 
 @Injectable()
 export class VenuesRepository {
   constructor(@Inject(DATABASE) private readonly db: Database) {}
 
-  listPublic(query: { search?: string; city?: string; sportType?: string }) {
+  private venueSelectFields() {
+    return {
+      id: venues.id,
+      ownerId: venues.ownerId,
+      categoryId: venues.categoryId,
+      sportType: categories.name,
+      categoryName: categories.name,
+      categorySlug: categories.slug,
+      name: venues.name,
+      address: venues.address,
+      city: venues.city,
+      description: venues.description,
+      imageUrl: venues.imageUrl,
+      status: venues.status,
+      createdAt: venues.createdAt,
+      updatedAt: venues.updatedAt,
+    };
+  }
+
+  listPublic(query: { search?: string; city?: string; categoryId?: string; sportType?: string }) {
     const filters: SQL[] = [eq(venues.status, 'APPROVED')];
     if (query.city) filters.push(ilike(venues.city, `%${query.city.trim()}%`));
-    if (query.sportType) filters.push(ilike(venues.sportType, `%${query.sportType.trim()}%`));
+    if (query.categoryId) filters.push(eq(venues.categoryId, query.categoryId));
+    if (query.sportType) {
+      filters.push(
+        or(
+          ilike(categories.name, `%${query.sportType.trim()}%`),
+          ilike(categories.slug, `%${query.sportType.trim()}%`),
+        )!,
+      );
+    }
     if (query.search) {
       const search = `%${query.search.trim()}%`;
       filters.push(
-        or(ilike(venues.name, search), ilike(venues.address, search), ilike(venues.city, search))!,
+        or(
+          ilike(venues.name, search),
+          ilike(venues.address, search),
+          ilike(venues.city, search),
+          ilike(categories.name, search),
+        )!,
       );
     }
 
@@ -34,22 +74,37 @@ export class VenuesRepository {
       .select({
         id: venues.id,
         name: venues.name,
-        sportType: venues.sportType,
+        categoryId: venues.categoryId,
+        sportType: categories.name,
+        categoryName: categories.name,
+        categorySlug: categories.slug,
         address: venues.address,
         city: venues.city,
         description: venues.description,
         imageUrl: venues.imageUrl,
       })
       .from(venues)
+      .innerJoin(categories, eq(categories.id, venues.categoryId))
       .where(and(...filters))
       .orderBy(desc(venues.createdAt));
   }
 
   async findPublic(id: string): Promise<VenueRecord | undefined> {
     const [venue] = await this.db
-      .select()
+      .select(this.venueSelectFields())
       .from(venues)
+      .innerJoin(categories, eq(categories.id, venues.categoryId))
       .where(and(eq(venues.id, id), eq(venues.status, 'APPROVED')))
+      .limit(1);
+    return venue;
+  }
+
+  async findVenueWithCategory(id: string): Promise<VenueRecord | undefined> {
+    const [venue] = await this.db
+      .select(this.venueSelectFields())
+      .from(venues)
+      .innerJoin(categories, eq(categories.id, venues.categoryId))
+      .where(eq(venues.id, id))
       .limit(1);
     return venue;
   }
@@ -68,6 +123,52 @@ export class VenuesRepository {
       .from(operatingHours)
       .where(eq(operatingHours.venueId, venueId))
       .orderBy(asc(operatingHours.dayOfWeek));
+  }
+
+  listPricingRules(venueId: string) {
+    return this.db
+      .select()
+      .from(venuePricingRules)
+      .where(eq(venuePricingRules.venueId, venueId))
+      .orderBy(asc(venuePricingRules.startTime));
+  }
+
+  async createPricingRule(values: NewVenuePricingRule): Promise<VenuePricingRuleRecord> {
+    const [rule] = await this.db.insert(venuePricingRules).values(values).returning();
+    return rule;
+  }
+
+  async deletePricingRule(
+    id: string,
+    venueId: string,
+  ): Promise<VenuePricingRuleRecord | undefined> {
+    const [rule] = await this.db
+      .delete(venuePricingRules)
+      .where(and(eq(venuePricingRules.id, id), eq(venuePricingRules.venueId, venueId)))
+      .returning();
+    return rule;
+  }
+
+  async setPricingRules(
+    venueId: string,
+    rules: Array<{ id: string; startTime: string; endTime: string; hourlyRate: number }>,
+  ): Promise<VenuePricingRuleRecord[]> {
+    return this.db.transaction(async (tx) => {
+      await tx.delete(venuePricingRules).where(eq(venuePricingRules.venueId, venueId));
+      if (!rules.length) return [];
+      return tx
+        .insert(venuePricingRules)
+        .values(
+          rules.map((rule) => ({
+            id: rule.id,
+            venueId,
+            startTime: rule.startTime,
+            endTime: rule.endTime,
+            hourlyRate: rule.hourlyRate,
+          })),
+        )
+        .returning();
+    });
   }
 
   listScheduleBookings(courtIds: string[], dayStart: Date, dayEnd: Date) {
@@ -93,29 +194,32 @@ export class VenuesRepository {
 
   async createVenue(values: NewVenue): Promise<VenueRecord> {
     const [venue] = await this.db.insert(venues).values(values).returning();
-    return venue;
+    const withCategory = await this.findVenueWithCategory(venue.id);
+    return withCategory!;
   }
 
-  listOwned(ownerId: string) {
+  listOwned(ownerId: string): Promise<VenueRecord[]> {
     return this.db
-      .select()
+      .select(this.venueSelectFields())
       .from(venues)
+      .innerJoin(categories, eq(categories.id, venues.categoryId))
       .where(eq(venues.ownerId, ownerId))
       .orderBy(desc(venues.createdAt));
   }
 
   async findOwnedVenue(ownerId: string, id: string): Promise<VenueRecord | undefined> {
     const [venue] = await this.db
-      .select()
+      .select(this.venueSelectFields())
       .from(venues)
+      .innerJoin(categories, eq(categories.id, venues.categoryId))
       .where(and(eq(venues.id, id), eq(venues.ownerId, ownerId)))
       .limit(1);
     return venue;
   }
 
   async updateVenue(id: string, values: Partial<NewVenue>): Promise<VenueRecord | undefined> {
-    const [venue] = await this.db.update(venues).set(values).where(eq(venues.id, id)).returning();
-    return venue;
+    await this.db.update(venues).set(values).where(eq(venues.id, id));
+    return this.findVenueWithCategory(id);
   }
 
   async createCourt(values: NewCourt): Promise<CourtRecord> {
@@ -171,16 +275,16 @@ export class VenuesRepository {
     return hours;
   }
 
-  listForAdmin() {
-    return this.db.select().from(venues).orderBy(desc(venues.createdAt));
+  listForAdmin(): Promise<VenueRecord[]> {
+    return this.db
+      .select(this.venueSelectFields())
+      .from(venues)
+      .innerJoin(categories, eq(categories.id, venues.categoryId))
+      .orderBy(desc(venues.createdAt));
   }
 
   async reviewVenue(id: string, status: 'APPROVED' | 'REJECTED'): Promise<VenueRecord | undefined> {
-    const [venue] = await this.db
-      .update(venues)
-      .set({ status, updatedAt: new Date() })
-      .where(eq(venues.id, id))
-      .returning();
-    return venue;
+    await this.db.update(venues).set({ status, updatedAt: new Date() }).where(eq(venues.id, id));
+    return this.findVenueWithCategory(id);
   }
 }

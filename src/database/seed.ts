@@ -17,6 +17,46 @@ async function seed() {
   const partnerId = createUuidV7();
   const adminId = createUuidV7();
   const venueId = createUuidV7();
+  const badmintonCategoryId = createUuidV7();
+
+  await db.insert(schema.categories).values([
+    {
+      id: badmintonCategoryId,
+      name: 'Cầu lông',
+      slug: 'badminton',
+      isActive: true,
+    },
+    {
+      id: createUuidV7(),
+      name: 'Tennis',
+      slug: 'tennis',
+      isActive: true,
+    },
+    {
+      id: createUuidV7(),
+      name: 'Bóng đá',
+      slug: 'football',
+      isActive: true,
+    },
+    {
+      id: createUuidV7(),
+      name: 'Bóng rổ',
+      slug: 'basketball',
+      isActive: true,
+    },
+    {
+      id: createUuidV7(),
+      name: 'Pickleball',
+      slug: 'pickleball',
+      isActive: true,
+    },
+    {
+      id: createUuidV7(),
+      name: 'Bóng bàn',
+      slug: 'table-tennis',
+      isActive: true,
+    },
+  ]);
 
   await db.insert(schema.users).values([
     {
@@ -47,17 +87,33 @@ async function seed() {
   await db.insert(schema.venues).values({
     id: venueId,
     ownerId: partnerId,
+    categoryId: badmintonCategoryId,
     name: 'CourtHub District 1',
-    sportType: 'Badminton',
     address: '12 Nguyen Hue',
     city: 'Ho Chi Minh City',
     description: 'Demo venue for CourtHub booking flow.',
     status: 'APPROVED',
   });
   await db.insert(schema.courts).values([
-    { id: createUuidV7(), venueId, name: 'Court 1', hourlyRate: 120000 },
-    { id: createUuidV7(), venueId, name: 'Court 2', hourlyRate: 150000 },
-    { id: createUuidV7(), venueId, name: 'Court 3', hourlyRate: 150000 },
+    { id: createUuidV7(), venueId, name: 'Court 1' },
+    { id: createUuidV7(), venueId, name: 'Court 2' },
+    { id: createUuidV7(), venueId, name: 'Court 3' },
+  ]);
+  await db.insert(schema.venuePricingRules).values([
+    {
+      id: createUuidV7(),
+      venueId,
+      startTime: '05:00',
+      endTime: '13:00',
+      hourlyRate: 150000,
+    },
+    {
+      id: createUuidV7(),
+      venueId,
+      startTime: '15:00',
+      endTime: '22:00',
+      hourlyRate: 200000,
+    },
   ]);
   await db.insert(schema.operatingHours).values(
     Array.from({ length: 7 }, (_, dayOfWeek) => ({

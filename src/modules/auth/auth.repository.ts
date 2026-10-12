@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { desc, eq, or } from 'drizzle-orm';
+import { and, desc, eq, ne, or } from 'drizzle-orm';
 import { DATABASE, type Database } from '../../database/database.module';
 import {
   sessions,
@@ -36,6 +36,25 @@ export class AuthRepository {
     return user;
   }
 
+  async findByContactExcludingUser(
+    userId: string,
+    email: string | null,
+    phone: string | null,
+  ): Promise<AuthUserRecord | undefined> {
+    if (!email && !phone) return undefined;
+
+    const conditions = [];
+    if (email) conditions.push(eq(users.email, email));
+    if (phone) conditions.push(eq(users.phone, phone));
+
+    const [user] = await this.db
+      .select()
+      .from(users)
+      .where(and(ne(users.id, userId), or(...conditions)))
+      .limit(1);
+    return user;
+  }
+
   async findByIdentifier(identifier: string): Promise<AuthUserRecord | undefined> {
     const normalizedPhone = identifier.replace(/[\s().-]/g, '');
     const condition = identifier.includes('@')
@@ -52,6 +71,15 @@ export class AuthRepository {
 
   async createCustomer(values: NewUser): Promise<AuthUserRecord> {
     const [user] = await this.db.insert(users).values(values).returning();
+    return user;
+  }
+
+  async updateUser(userId: string, values: Partial<NewUser>): Promise<AuthUserRecord> {
+    const [user] = await this.db
+      .update(users)
+      .set({ ...values, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
     return user;
   }
 

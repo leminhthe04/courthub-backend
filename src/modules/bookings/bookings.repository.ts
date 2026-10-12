@@ -1,10 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import { DATABASE, type Database } from '../../database/database.module';
 import {
   bookings,
   courts,
   operatingHours,
+  venuePricingRules,
   venues,
   type Booking,
   type NewBooking,
@@ -22,7 +23,6 @@ export class BookingsRepository {
       .select({
         id: courts.id,
         venueId: venues.id,
-        hourlyRate: courts.hourlyRate,
         courtActive: courts.isActive,
         venueStatus: venues.status,
       })
@@ -31,6 +31,14 @@ export class BookingsRepository {
       .where(eq(courts.id, courtId))
       .limit(1);
     return court;
+  }
+
+  async findPricingRules(venueId: string) {
+    return this.db
+      .select()
+      .from(venuePricingRules)
+      .where(eq(venuePricingRules.venueId, venueId))
+      .orderBy(asc(venuePricingRules.startTime));
   }
 
   async findOperatingHours(venueId: string, dayOfWeek: number) {
