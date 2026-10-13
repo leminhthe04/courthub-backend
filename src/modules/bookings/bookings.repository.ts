@@ -76,15 +76,6 @@ export class BookingsRepository {
       .orderBy(desc(bookings.startAt));
   }
 
-  async cancel(id: string): Promise<BookingRecord | undefined> {
-    const [booking] = await this.db
-      .update(bookings)
-      .set({ status: 'CANCELLED', updatedAt: new Date() })
-      .where(eq(bookings.id, id))
-      .returning();
-    return booking;
-  }
-
   listForPartner(userId: string) {
     return this.db
       .select({
@@ -94,7 +85,8 @@ export class BookingsRepository {
         venueId: venues.id,
         venueName: venues.name,
         customerId: bookings.customerId,
-        guestName: bookings.guestName,
+        contactName: bookings.contactName,
+        contactEmail: bookings.contactEmail,
         contactPhone: bookings.contactPhone,
         startAt: bookings.startAt,
         endAt: bookings.endAt,
@@ -137,7 +129,8 @@ export class BookingsRepository {
         id: bookings.id,
         venueName: venues.name,
         courtName: courts.name,
-        guestName: bookings.guestName,
+        contactName: bookings.contactName,
+        contactEmail: bookings.contactEmail,
         contactPhone: bookings.contactPhone,
         customerId: bookings.customerId,
         startAt: bookings.startAt,

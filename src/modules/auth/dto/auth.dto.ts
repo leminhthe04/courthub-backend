@@ -9,9 +9,8 @@ export class RegisterDto {
   @MinLength(2)
   fullName!: string;
 
-  @IsOptional()
   @IsEmail()
-  email?: string;
+  email!: string;
 
   @IsOptional()
   @Matches(phonePattern, { message: 'phone must be a valid phone number' })
@@ -37,18 +36,22 @@ export class UpdateProfileDto {
   @MinLength(2)
   fullName?: string;
 
-  @IsOptional()
   @IsEmail()
-  email?: string;
+  email!: string;
 
   @IsOptional()
   @Matches(phonePattern, { message: 'phone must be a valid phone number' })
   phone?: string;
 }
 
-export class ChangePasswordDto {
+export class RequestPasswordResetDto {
+  @IsEmail()
+  email!: string;
+}
+
+export class ConfirmPasswordResetDto {
   @IsString()
-  currentPassword!: string;
+  token!: string;
 
   @IsString()
   @MinLength(8)

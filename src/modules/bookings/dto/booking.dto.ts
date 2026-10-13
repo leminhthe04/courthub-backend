@@ -1,4 +1,13 @@
-import { IsISO8601, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+  IsEmail,
+  IsISO8601,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 
 // Request contracts for booking endpoints.
 
@@ -14,12 +23,18 @@ export class CreateBookingDto {
   @IsISO8601()
   endAt!: string;
 
-  @IsOptional()
   @IsString()
   @MaxLength(120)
-  guestName?: string;
+  contactName!: string;
 
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
+  @IsEmail()
+  @MaxLength(255)
+  contactEmail?: string;
+
+  @IsOptional()
+  @IsString()
   @Matches(phonePattern, { message: 'contactPhone must be a valid phone number' })
   contactPhone?: string;
 
@@ -27,12 +42,6 @@ export class CreateBookingDto {
   @IsString()
   @MaxLength(500)
   note?: string;
-}
-
-export class CancelBookingDto {
-  @IsOptional()
-  @IsString()
-  guestToken?: string;
 }
 
 export class RejectBookingDto {

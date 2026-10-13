@@ -28,22 +28,30 @@ export const sessionRevokeReasonEnum = pgEnum('session_revoke_reason', [
   'EXPIRED',
   'REVOKED_BY_ADMIN',
 ]);
+export const partnerRequestStatusEnum = pgEnum('partner_request_status', [
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+]);
 
 export const users = pgTable(
   'users',
   {
     id: uuid('id').primaryKey(),
     fullName: varchar('full_name', { length: 120 }).notNull(),
-    email: varchar('email', { length: 255 }),
+    email: varchar('email', { length: 255 }).notNull(),
     phone: varchar('phone', { length: 32 }),
+    googleSubject: varchar('google_subject', { length: 255 }),
     passwordHash: text('password_hash').notNull(),
     role: userRoleEnum('role').notNull().default('CUSTOMER'),
+    isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex('users_email_unique').on(table.email),
     uniqueIndex('users_phone_unique').on(table.phone),
+    uniqueIndex('users_google_subject_unique').on(table.googleSubject),
   ],
 );
 
@@ -98,6 +106,7 @@ export const courts = pgTable(
       .references(() => venues.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 100 }).notNull(),
     isActive: boolean('is_active').notNull().default(true),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -141,9 +150,9 @@ export const bookings = pgTable(
       .notNull()
       .references(() => courts.id, { onDelete: 'restrict' }),
     customerId: uuid('customer_id').references(() => users.id, { onDelete: 'set null' }),
-    guestName: varchar('guest_name', { length: 120 }),
+    contactName: varchar('contact_name', { length: 120 }).notNull(),
+    contactEmail: varchar('contact_email', { length: 255 }),
     contactPhone: varchar('contact_phone', { length: 32 }).notNull(),
-    guestTokenHash: text('guest_token_hash'),
     startAt: timestamp('start_at', { withTimezone: true }).notNull(),
     endAt: timestamp('end_at', { withTimezone: true }).notNull(),
     status: bookingStatusEnum('status').notNull().default('PENDING'),
@@ -182,6 +191,46 @@ export const sessions = pgTable(
   ],
 );
 
+export const partnerRequests = pgTable(
+  'partner_requests',
+  {
+    id: uuid('id').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    message: text('message'),
+    status: partnerRequestStatusEnum('status').notNull().default('PENDING'),
+    reviewedBy: uuid('reviewed_by').references(() => users.id, { onDelete: 'set null' }),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('partner_requests_user_unique').on(table.userId),
+    index('partner_requests_status_idx').on(table.status, table.createdAt),
+  ],
+);
+
+export const passwordResetTokens = pgTable(
+  'password_reset_tokens',
+  {
+    id: uuid('id').primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('password_reset_tokens_hash_unique').on(table.tokenHash),
+    index('password_reset_tokens_user_idx').on(table.userId),
+    index('password_reset_tokens_expires_idx').on(table.expiresAt),
+  ],
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Category = typeof categories.$inferSelect;
@@ -196,7 +245,12 @@ export type Booking = typeof bookings.$inferSelect;
 export type NewBooking = typeof bookings.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
+export type PartnerRequest = typeof partnerRequests.$inferSelect;
+export type NewPartnerRequest = typeof partnerRequests.$inferInsert;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
+export type NewPasswordResetToken = typeof passwordResetTokens.$inferInsert;
 export type UserRole = 'CUSTOMER' | 'PARTNER' | 'ADMIN';
 export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'REJECTED';
 export type SessionRevokeReason = 'LOGOUT' | 'ROTATED' | 'EXPIRED' | 'REVOKED_BY_ADMIN';
+export type PartnerRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 export type DayOfWeek = (typeof dayOfWeekEnum.enumValues)[number];

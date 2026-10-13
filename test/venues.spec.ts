@@ -45,4 +45,46 @@ describe('VenuesModule', () => {
     expect(result.status).toBe('APPROVED');
     expect(result.courts).toEqual([]);
   });
+
+  it('rejects making a court inactive when it has future bookings', async () => {
+    const mockRepo = {
+      findCourtWithOwner: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue({
+        ownerId: 'owner-uuid-1',
+        court: { id: 'court-uuid-1', isActive: true },
+      }),
+      hasFutureBookings: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue(true),
+      updateCourt: jest.fn(),
+    } as unknown as VenuesRepository;
+
+    const service = new VenuesService(mockRepo);
+
+    await expect(
+      service.updateCourt('owner-uuid-1', 'court-uuid-1', { isActive: false }),
+    ).rejects.toThrow(BadRequestException);
+    expect(mockRepo.updateCourt).not.toHaveBeenCalled();
+  });
+
+  it('soft deletes a court when it has no future bookings', async () => {
+    const deletedCourt = {
+      id: 'court-uuid-1',
+      venueId: 'venue-uuid-1',
+      name: 'Court 1',
+      isActive: false,
+      deletedAt: new Date(),
+    };
+    const mockRepo = {
+      findCourtWithOwner: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue({
+        ownerId: 'owner-uuid-1',
+        court: { id: 'court-uuid-1', isActive: true },
+      }),
+      hasFutureBookings: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue(false),
+      softDeleteCourt: jest.fn<(...args: any[]) => Promise<any>>().mockResolvedValue(deletedCourt),
+    } as unknown as VenuesRepository;
+
+    const service = new VenuesService(mockRepo);
+    const result = await service.deleteCourt('owner-uuid-1', 'court-uuid-1');
+
+    expect(mockRepo.softDeleteCourt).toHaveBeenCalledWith('court-uuid-1', expect.any(Date));
+    expect(result).toEqual(deletedCourt);
+  });
 });

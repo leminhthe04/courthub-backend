@@ -176,7 +176,44 @@ export class VenuesService {
         message: 'You do not own this court',
       });
     }
+
+    if (dto.isActive === false && row.court.isActive) {
+      const hasFutureBookings = await this.repository.hasFutureBookings(row.court.id, new Date());
+      if (hasFutureBookings) {
+        throw new BadRequestException({
+          code: ErrorCode.VENUE_COURT_HAS_FUTURE_BOOKINGS,
+          message: 'Court cannot be inactive while it has future bookings',
+        });
+      }
+    }
+
     return this.repository.updateCourt(courtId, { ...dto, updatedAt: new Date() });
+  }
+
+  async deleteCourt(ownerId: string, courtId: string) {
+    const row = await this.repository.findCourtWithOwner(courtId);
+    if (!row) {
+      throw new NotFoundException({
+        code: ErrorCode.BOOKING_COURT_NOT_FOUND,
+        message: 'Court not found',
+      });
+    }
+    if (row.ownerId !== ownerId) {
+      throw new ForbiddenException({
+        code: ErrorCode.VENUE_FORBIDDEN,
+        message: 'You do not own this court',
+      });
+    }
+
+    const hasFutureBookings = await this.repository.hasFutureBookings(row.court.id, new Date());
+    if (hasFutureBookings) {
+      throw new BadRequestException({
+        code: ErrorCode.VENUE_COURT_HAS_FUTURE_BOOKINGS,
+        message: 'Court cannot be deleted while it has future bookings',
+      });
+    }
+
+    return this.repository.softDeleteCourt(row.court.id, new Date());
   }
 
   async listPricingRules(venueId: string) {

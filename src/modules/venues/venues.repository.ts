@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, gt, ilike, inArray, lt, or, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, ilike, inArray, isNull, lt, or, type SQL } from 'drizzle-orm';
 import { DATABASE, type Database } from '../../database/database.module';
 import {
   bookings,
@@ -7,6 +7,7 @@ import {
   courts,
   venuePricingRules,
   venues,
+  users,
   type NewCourt,
   type NewVenue,
   type NewVenuePricingRule,
@@ -44,7 +45,7 @@ export class VenuesRepository {
   }
 
   listPublic(query: { search?: string; city?: string; categoryId?: string; sportType?: string }) {
-    const filters: SQL[] = [eq(venues.status, 'APPROVED')];
+    const filters: SQL[] = [eq(venues.status, 'APPROVED'), eq(users.isActive, true)];
     if (query.city) filters.push(ilike(venues.city, `%${query.city.trim()}%`));
     if (query.categoryId) filters.push(eq(venues.categoryId, query.categoryId));
     if (query.sportType) {
@@ -82,6 +83,7 @@ export class VenuesRepository {
       })
       .from(venues)
       .innerJoin(categories, eq(categories.id, venues.categoryId))
+      .innerJoin(users, eq(users.id, venues.ownerId))
       .where(and(...filters))
       .orderBy(desc(venues.createdAt));
   }
@@ -91,7 +93,8 @@ export class VenuesRepository {
       .select(this.venueSelectFields())
       .from(venues)
       .innerJoin(categories, eq(categories.id, venues.categoryId))
-      .where(and(eq(venues.id, id), eq(venues.status, 'APPROVED')))
+      .innerJoin(users, eq(users.id, venues.ownerId))
+      .where(and(eq(venues.id, id), eq(venues.status, 'APPROVED'), eq(users.isActive, true)))
       .limit(1);
     return venue;
   }
@@ -110,7 +113,7 @@ export class VenuesRepository {
     return this.db
       .select()
       .from(courts)
-      .where(eq(courts.venueId, venueId))
+      .where(and(eq(courts.venueId, venueId), isNull(courts.deletedAt)))
       .orderBy(asc(courts.name));
   }
 
@@ -228,9 +231,24 @@ export class VenuesRepository {
       .select({ court: courts, ownerId: venues.ownerId })
       .from(courts)
       .innerJoin(venues, eq(venues.id, courts.venueId))
-      .where(eq(courts.id, courtId))
+      .where(and(eq(courts.id, courtId), isNull(courts.deletedAt)))
       .limit(1);
     return row;
+  }
+
+  async hasFutureBookings(courtId: string, now: Date): Promise<boolean> {
+    const [booking] = await this.db
+      .select({ id: bookings.id })
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.courtId, courtId),
+          gt(bookings.startAt, now),
+          or(eq(bookings.status, 'PENDING'), eq(bookings.status, 'CONFIRMED')),
+        ),
+      )
+      .limit(1);
+    return Boolean(booking);
   }
 
   async updateCourt(courtId: string, values: Partial<NewCourt>): Promise<CourtRecord | undefined> {
@@ -238,6 +256,15 @@ export class VenuesRepository {
       .update(courts)
       .set(values)
       .where(eq(courts.id, courtId))
+      .returning();
+    return court;
+  }
+
+  async softDeleteCourt(courtId: string, deletedAt: Date): Promise<CourtRecord | undefined> {
+    const [court] = await this.db
+      .update(courts)
+      .set({ deletedAt, isActive: false, updatedAt: deletedAt })
+      .where(and(eq(courts.id, courtId), isNull(courts.deletedAt)))
       .returning();
     return court;
   }
