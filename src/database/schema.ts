@@ -36,6 +36,7 @@ export const users = pgTable(
     fullName: varchar('full_name', { length: 120 }).notNull(),
     email: varchar('email', { length: 255 }),
     phone: varchar('phone', { length: 32 }),
+    googleSubject: varchar('google_subject', { length: 255 }),
     passwordHash: text('password_hash').notNull(),
     role: userRoleEnum('role').notNull().default('CUSTOMER'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -44,6 +45,7 @@ export const users = pgTable(
   (table) => [
     uniqueIndex('users_email_unique').on(table.email),
     uniqueIndex('users_phone_unique').on(table.phone),
+    uniqueIndex('users_google_subject_unique').on(table.googleSubject),
   ],
 );
 
@@ -141,9 +143,9 @@ export const bookings = pgTable(
       .notNull()
       .references(() => courts.id, { onDelete: 'restrict' }),
     customerId: uuid('customer_id').references(() => users.id, { onDelete: 'set null' }),
-    guestName: varchar('guest_name', { length: 120 }),
+    contactName: varchar('contact_name', { length: 120 }).notNull(),
+    contactEmail: varchar('contact_email', { length: 255 }),
     contactPhone: varchar('contact_phone', { length: 32 }).notNull(),
-    guestTokenHash: text('guest_token_hash'),
     startAt: timestamp('start_at', { withTimezone: true }).notNull(),
     endAt: timestamp('end_at', { withTimezone: true }).notNull(),
     status: bookingStatusEnum('status').notNull().default('PENDING'),

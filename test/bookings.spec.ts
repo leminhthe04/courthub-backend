@@ -73,7 +73,7 @@ describe('BookingsModule', () => {
         startAt: '2026-10-09T12:30:00+07:00',
         endAt: '2026-10-09T14:00:00+07:00',
         contactPhone: '0901234567',
-        guestName: 'John Doe',
+        contactName: 'John Doe',
       },
       null,
     );
@@ -116,7 +116,7 @@ describe('BookingsModule', () => {
           startAt: '2026-10-09T12:30:00+07:00',
           endAt: '2026-10-09T13:30:00+07:00',
           contactPhone: '0901234567',
-          guestName: 'John Doe',
+          contactName: 'John Doe',
         },
         null,
       ),

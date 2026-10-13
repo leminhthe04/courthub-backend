@@ -4,25 +4,19 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-  UnauthorizedException,
 } from '@nestjs/common';
-import { createHash, randomBytes } from 'node:crypto';
 import type { AuthUser } from '../../common/auth.types';
 import { ErrorCode } from '../../common/error-codes';
 import { dayOfWeekFromDate } from '../../common/day-of-week';
 import { createUuidV7 } from '../../common/uuid';
 import { bookingWindowError } from './booking-rules';
 import { BookingsRepository, type BookingRecord } from './bookings.repository';
-import { CancelBookingDto, CreateBookingDto } from './dto/booking.dto';
+import { CreateBookingDto } from './dto/booking.dto';
 
 const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
 function normalizePhone(value: string) {
   return value.replace(/[\s().-]/g, '');
-}
-
-function hashToken(token: string) {
-  return createHash('sha256').update(token).digest('hex');
 }
 
 function localDate(value: Date) {
@@ -59,7 +53,8 @@ function publicBooking(booking: BookingRecord) {
     id: booking.id,
     courtId: booking.courtId,
     customerId: booking.customerId,
-    guestName: booking.guestName,
+    contactName: booking.contactName,
+    contactEmail: booking.contactEmail,
     contactPhone: booking.contactPhone,
     startAt: booking.startAt,
     endAt: booking.endAt,
@@ -109,7 +104,6 @@ export class BookingsService {
     const dayOfWeek = dayOfWeekFromDate(new Date(`${localDate(start)}T12:00:00+07:00`));
     const startMinutes = minutesInVietnam(start);
 
-    const isGuest = !user;
     const contactPhone = normalizePhone(dto.contactPhone ?? user?.phone ?? '');
     if (!contactPhone) {
       throw new BadRequestException({
@@ -117,10 +111,10 @@ export class BookingsService {
         message: 'Phone number is required before booking',
       });
     }
-    if (isGuest && !dto.guestName?.trim()) {
+    if (!dto.contactName?.trim()) {
       throw new BadRequestException({
         code: ErrorCode.BOOKING_GUEST_NAME_REQUIRED,
-        message: 'Guest name is required before booking',
+        message: 'Contact name is required before booking',
       });
     }
 
@@ -151,7 +145,6 @@ export class BookingsService {
       totalCost += Number(rule.hourlyRate) * 0.5;
     }
 
-    const guestToken = isGuest ? randomBytes(24).toString('hex') : null;
     const totalAmount = Number(totalCost.toFixed(2));
 
     try {
@@ -159,16 +152,16 @@ export class BookingsService {
         id: createUuidV7(),
         courtId: court.id,
         customerId: user?.userId ?? null,
-        guestName: isGuest ? dto.guestName!.trim() : null,
+        contactName: dto.contactName.trim(),
+        contactEmail: dto.contactEmail?.trim() || null,
         contactPhone,
-        guestTokenHash: guestToken ? hashToken(guestToken) : null,
         startAt: start,
         endAt: end,
-        status: 'PENDING',
+        status: 'CONFIRMED',
         totalAmount,
         note: dto.note?.trim() || null,
       });
-      return { booking: publicBooking(created), guestToken };
+      return { booking: publicBooking(created) };
     } catch (error) {
       const code = (error as { code?: string }).code;
       if (code === '23P01' || code === '23505') {
@@ -183,43 +176,6 @@ export class BookingsService {
 
   listMine(userId: string) {
     return this.repository.listMine(userId);
-  }
-
-  async cancel(id: string, user: AuthUser | null, dto: CancelBookingDto) {
-    const booking = await this.repository.findById(id);
-    if (!booking) {
-      throw new NotFoundException({
-        code: ErrorCode.BOOKING_NOT_FOUND,
-        message: 'Booking not found',
-      });
-    }
-    if (booking.status === 'CANCELLED' || booking.status === 'REJECTED') {
-      throw new BadRequestException({
-        code: ErrorCode.BOOKING_ALREADY_ENDED,
-        message: 'Booking has already ended',
-      });
-    }
-
-    if (user) {
-      if (booking.customerId !== user.userId) {
-        throw new ForbiddenException({
-          code: ErrorCode.BOOKING_FORBIDDEN,
-          message: 'You do not own this booking',
-        });
-      }
-    } else if (
-      !dto.guestToken ||
-      !booking.guestTokenHash ||
-      hashToken(dto.guestToken) !== booking.guestTokenHash
-    ) {
-      throw new UnauthorizedException({
-        code: ErrorCode.BOOKING_INVALID_GUEST_TOKEN,
-        message: 'Invalid guest token',
-      });
-    }
-
-    const cancelled = await this.repository.cancel(id);
-    return publicBooking(cancelled!);
   }
 
   listForPartner(userId: string) {

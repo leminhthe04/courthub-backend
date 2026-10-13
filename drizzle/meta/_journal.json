@@ -36,6 +36,20 @@
       "when": 1791800000000,
       "tag": "0004_weekly_pricing_days",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791880000000,
+      "tag": "0005_booking_contact_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791960000000,
+      "tag": "0006_google_auth",
+      "breakpoints": true
     }
   ]
 }
