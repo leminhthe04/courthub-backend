@@ -5,36 +5,22 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1791518425955,
+      "when": 1791869123765,
       "tag": "0000_init_schema",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1791770461133,
-      "tag": "0001_demonic_exodus",
+      "when": 1791875088746,
+      "tag": "0001_add_user_activation_and_partner_requests",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "7",
-      "when": 1791777163236,
-      "tag": "0002_low_lady_ursula",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1791779000000,
-      "tag": "0003_sport_categories",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1791800000000,
-      "tag": "0004_weekly_pricing_days",
+      "when": 1791877413728,
+      "tag": "0002_add_password_reset_tokens_and_require_email",
       "breakpoints": true
     }
   ]

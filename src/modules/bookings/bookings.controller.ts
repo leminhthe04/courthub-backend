@@ -4,7 +4,7 @@ import type { AuthUser } from '../../common/auth.types';
 import { JwtAuthGuard, OptionalJwtAuthGuard } from '../../common/jwt-auth.guard';
 import { Roles } from '../../common/roles.decorator';
 import { RolesGuard } from '../../common/roles.guard';
-import { CancelBookingDto, CreateBookingDto } from './dto/booking.dto';
+import { CreateBookingDto } from './dto/booking.dto';
 import { BookingsService } from './bookings.service';
 
 @Controller('bookings')
@@ -21,16 +21,6 @@ export class BookingsController {
   @UseGuards(JwtAuthGuard)
   mine(@CurrentUser() user: AuthUser) {
     return this.bookings.listMine(user.userId);
-  }
-
-  @Post(':id/cancel')
-  @UseGuards(OptionalJwtAuthGuard)
-  cancel(
-    @Param('id') id: string,
-    @Body() dto: CancelBookingDto,
-    @CurrentUser() user: AuthUser | null,
-  ) {
-    return this.bookings.cancel(id, user, dto);
   }
 }
 

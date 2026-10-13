@@ -1,6 +1,6 @@
 {
-  "id": "bc6f9630-b294-4a43-9e0b-057a88eaf93c",
-  "prevId": "02f79833-50c8-4c42-bbaf-ea34945e82ad",
+  "id": "1a23e3b5-4c9f-454e-beae-1b3608f659df",
+  "prevId": "de800833-71d6-41f0-9c87-f03231b6dc08",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -26,9 +26,15 @@
           "primaryKey": false,
           "notNull": false
         },
-        "guest_name": {
-          "name": "guest_name",
+        "contact_name": {
+          "name": "contact_name",
           "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contact_email": {
+          "name": "contact_email",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
         },
@@ -37,12 +43,6 @@
           "type": "varchar(32)",
           "primaryKey": false,
           "notNull": true
-        },
-        "guest_token_hash": {
-          "name": "guest_token_hash",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "start_at": {
           "name": "start_at",
@@ -175,6 +175,89 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.categories": {
+      "name": "categories",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "categories_slug_unique": {
+          "name": "categories_slug_unique",
+          "columns": [
+            {
+              "expression": "slug",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "categories_is_active_idx": {
+          "name": "categories_is_active_idx",
+          "columns": [
+            {
+              "expression": "is_active",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.courts": {
       "name": "courts",
       "schema": "",
@@ -203,6 +286,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -257,8 +346,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.operating_hours": {
-      "name": "operating_hours",
+    "public.partner_requests": {
+      "name": "partner_requests",
       "schema": "",
       "columns": {
         "id": {
@@ -267,50 +356,59 @@
           "primaryKey": true,
           "notNull": true
         },
-        "venue_id": {
-          "name": "venue_id",
+        "user_id": {
+          "name": "user_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "day_of_week": {
-          "name": "day_of_week",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "open_time": {
-          "name": "open_time",
-          "type": "time",
+        "message": {
+          "name": "message",
+          "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "close_time": {
-          "name": "close_time",
-          "type": "time",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_closed": {
-          "name": "is_closed",
-          "type": "boolean",
+        "status": {
+          "name": "status",
+          "type": "partner_request_status",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": false
+          "default": "'PENDING'"
+        },
+        "reviewed_by": {
+          "name": "reviewed_by",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reviewed_at": {
+          "name": "reviewed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
         }
       },
       "indexes": {
-        "operating_hours_venue_day_unique": {
-          "name": "operating_hours_venue_day_unique",
+        "partner_requests_user_unique": {
+          "name": "partner_requests_user_unique",
           "columns": [
             {
-              "expression": "venue_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "day_of_week",
+              "expression": "user_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -320,15 +418,165 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "partner_requests_status_idx": {
+          "name": "partner_requests_status_idx",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "operating_hours_venue_id_venues_id_fk": {
-          "name": "operating_hours_venue_id_venues_id_fk",
-          "tableFrom": "operating_hours",
-          "tableTo": "venues",
+        "partner_requests_user_id_users_id_fk": {
+          "name": "partner_requests_user_id_users_id_fk",
+          "tableFrom": "partner_requests",
+          "tableTo": "users",
           "columnsFrom": [
-            "venue_id"
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "partner_requests_reviewed_by_users_id_fk": {
+          "name": "partner_requests_reviewed_by_users_id_fk",
+          "tableFrom": "partner_requests",
+          "tableTo": "users",
+          "columnsFrom": [
+            "reviewed_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.password_reset_tokens": {
+      "name": "password_reset_tokens",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "used_at": {
+          "name": "used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "password_reset_tokens_hash_unique": {
+          "name": "password_reset_tokens_hash_unique",
+          "columns": [
+            {
+              "expression": "token_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "password_reset_tokens_user_idx": {
+          "name": "password_reset_tokens_user_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "password_reset_tokens_expires_idx": {
+          "name": "password_reset_tokens_expires_idx",
+          "columns": [
+            {
+              "expression": "expires_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "password_reset_tokens_user_id_users_id_fk": {
+          "name": "password_reset_tokens_user_id_users_id_fk",
+          "tableFrom": "password_reset_tokens",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
           ],
           "columnsTo": [
             "id"
@@ -506,11 +754,17 @@
           "name": "email",
           "type": "varchar(255)",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "phone": {
           "name": "phone",
           "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "google_subject": {
+          "name": "google_subject",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
         },
@@ -527,6 +781,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'CUSTOMER'"
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
         },
         "created_at": {
           "name": "created_at",
@@ -573,6 +834,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "users_google_subject_unique": {
+          "name": "users_google_subject_unique",
+          "columns": [
+            {
+              "expression": "google_subject",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {},
@@ -595,6 +871,13 @@
         "venue_id": {
           "name": "venue_id",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "day_of_week": {
+          "name": "day_of_week",
+          "type": "day_of_week",
+          "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
         },
@@ -632,11 +915,23 @@
         }
       },
       "indexes": {
-        "venue_pricing_rules_venue_id_idx": {
-          "name": "venue_pricing_rules_venue_id_idx",
+        "venue_pricing_rules_venue_day_idx": {
+          "name": "venue_pricing_rules_venue_day_idx",
           "columns": [
             {
               "expression": "venue_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "day_of_week",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "start_time",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -685,15 +980,15 @@
           "primaryKey": false,
           "notNull": true
         },
-        "name": {
-          "name": "name",
-          "type": "varchar(160)",
+        "category_id": {
+          "name": "category_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         },
-        "sport_type": {
-          "name": "sport_type",
-          "type": "varchar(60)",
+        "name": {
+          "name": "name",
+          "type": "varchar(160)",
           "primaryKey": false,
           "notNull": true
         },
@@ -760,6 +1055,21 @@
           "method": "btree",
           "with": {}
         },
+        "venues_category_id_idx": {
+          "name": "venues_category_id_idx",
+          "columns": [
+            {
+              "expression": "category_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "venues_search_idx": {
           "name": "venues_search_idx",
           "columns": [
@@ -795,6 +1105,19 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "venues_category_id_categories_id_fk": {
+          "name": "venues_category_id_categories_id_fk",
+          "tableFrom": "venues",
+          "tableTo": "categories",
+          "columnsFrom": [
+            "category_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -812,6 +1135,28 @@
         "PENDING",
         "CONFIRMED",
         "CANCELLED",
+        "REJECTED"
+      ]
+    },
+    "public.day_of_week": {
+      "name": "day_of_week",
+      "schema": "public",
+      "values": [
+        "MON",
+        "TUE",
+        "WED",
+        "THU",
+        "FRI",
+        "SAT",
+        "SUN"
+      ]
+    },
+    "public.partner_request_status": {
+      "name": "partner_request_status",
+      "schema": "public",
+      "values": [
+        "PENDING",
+        "APPROVED",
         "REJECTED"
       ]
     },

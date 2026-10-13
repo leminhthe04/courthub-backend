@@ -93,6 +93,11 @@ export class PartnerVenuesController {
     return this.venues.updateCourt(user.userId, courtId, dto);
   }
 
+  @Delete('courts/:courtId')
+  deleteCourt(@CurrentUser() user: AuthUser, @Param('courtId') courtId: string) {
+    return this.venues.deleteCourt(user.userId, courtId);
+  }
+
   @Get(':venueId/pricing-rules')
   listPricingRules(@Param('venueId') venueId: string) {
     return this.venues.listPricingRules(venueId);

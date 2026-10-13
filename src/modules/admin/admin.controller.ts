@@ -3,7 +3,9 @@ import { JwtAuthGuard } from '../../common/jwt-auth.guard';
 import { Roles } from '../../common/roles.decorator';
 import { RolesGuard } from '../../common/roles.guard';
 import { AdminService } from './admin.service';
-import { UpdateUserRoleDto } from './dto/admin.dto';
+import { UpdateUserRoleDto, UpdateUserStatusDto } from './dto/admin.dto';
+import { CurrentUser } from '../../common/current-user.decorator';
+import type { AuthUser } from '../../common/auth.types';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -22,8 +24,21 @@ export class AdminController {
   }
 
   @Patch('users/:id/role')
-  updateUserRole(@Param('id') id: string, @Body() dto: UpdateUserRoleDto) {
+  updateUserRole(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateUserRoleDto,
+  ) {
     return this.admin.updateUserRole(id, dto.role);
+  }
+
+  @Patch('users/:id/status')
+  updateUserStatus(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateUserStatusDto,
+  ) {
+    return this.admin.updateUserStatus(user.userId, id, dto.isActive);
   }
 
   @Post('venues/:id/approve')

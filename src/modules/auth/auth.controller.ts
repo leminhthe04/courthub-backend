@@ -1,7 +1,15 @@
 import { Body, Controller, Get, Patch, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import type { Request, Response } from 'express';
+import type { Profile } from 'passport-google-oauth20';
 import { AuthService } from './auth.service';
-import { ChangePasswordDto, LoginDto, RegisterDto, UpdateProfileDto } from './dto/auth.dto';
+import {
+  ConfirmPasswordResetDto,
+  LoginDto,
+  RegisterDto,
+  RequestPasswordResetDto,
+  UpdateProfileDto,
+} from './dto/auth.dto';
 import { CurrentUser } from '../../common/current-user.decorator';
 import type { AuthUser } from '../../common/auth.types';
 import { JwtAuthGuard } from '../../common/jwt-auth.guard';
@@ -36,6 +44,24 @@ export class AuthController {
     const session = await this.auth.login(dto, userAgent, ipAddress);
     this.setAuthCookies(response, session);
     return { user: session.user };
+  }
+
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  googleLogin() {
+    // Passport redirects the request to Google.
+  }
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleCallback(
+    @Req() req: Request & { user: Profile },
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const { userAgent, ipAddress } = this.getClientInfo(req);
+    const session = await this.auth.loginWithGoogle(req.user, userAgent, ipAddress);
+    this.setAuthCookies(response, session);
+    response.redirect(this.config.frontendUrls[0]);
   }
 
   @Post('refresh')
@@ -73,10 +99,20 @@ export class AuthController {
     return { user: updated };
   }
 
-  @Patch('password')
+  @Post('password-reset/request')
+  requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
+    return this.auth.requestPasswordReset(dto);
+  }
+
+  @Post('password-reset/request-me')
   @UseGuards(JwtAuthGuard)
-  async changePassword(@CurrentUser() user: AuthUser, @Body() dto: ChangePasswordDto) {
-    return this.auth.changePassword(user.userId, dto);
+  requestPasswordResetForUser(@CurrentUser() user: AuthUser) {
+    return this.auth.requestPasswordResetForUser(user.userId);
+  }
+
+  @Post('password-reset/confirm')
+  confirmPasswordReset(@Body() dto: ConfirmPasswordResetDto) {
+    return this.auth.confirmPasswordReset(dto);
   }
 
   private setAuthCookies(

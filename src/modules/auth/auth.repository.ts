@@ -36,6 +36,15 @@ export class AuthRepository {
     return user;
   }
 
+  async findByGoogleSubject(googleSubject: string): Promise<AuthUserRecord | undefined> {
+    const [user] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.googleSubject, googleSubject))
+      .limit(1);
+    return user;
+  }
+
   async findByContactExcludingUser(
     userId: string,
     email: string | null,
@@ -128,6 +137,18 @@ export class AuthRepository {
         updatedAt: new Date(),
       })
       .where(eq(sessions.id, sessionId));
+  }
+
+  async revokeAllUserSessions(userId: string, reason: SessionRevokeReason): Promise<void> {
+    await this.db
+      .update(sessions)
+      .set({
+        isRevoked: true,
+        revokedAt: new Date(),
+        revokedReason: reason,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(sessions.userId, userId), eq(sessions.isRevoked, false)));
   }
 
   async listUserSessions(userId: string): Promise<SessionRecord[]> {

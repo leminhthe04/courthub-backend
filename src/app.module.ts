@@ -7,6 +7,7 @@ import { CategoriesModule } from './modules/categories/categories.module';
 import { VenuesModule } from './modules/venues/venues.module';
 import { HealthController } from './health.controller';
 import { EnvConfigModule } from './config/env-config.module';
+import { PartnerRequestsModule } from './modules/partner-requests/partner-requests.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { EnvConfigModule } from './config/env-config.module';
     VenuesModule,
     BookingsModule,
     AdminModule,
+    PartnerRequestsModule,
   ],
   controllers: [HealthController],
 })
