@@ -125,6 +125,7 @@ export class AuthController {
     // 1. Access Token: short-lived (15m), HttpOnly, sent to all paths
     response.cookie('access_token', tokens.accessToken, {
       httpOnly: true,
+      domain: this.config.cookieDomain,
       sameSite,
       secure: isProduction,
       path: '/',
@@ -134,6 +135,7 @@ export class AuthController {
     // 2. Refresh Token: long-lived (7d), HttpOnly, scoped strictly to /api/auth
     response.cookie('refresh_token', tokens.refreshToken, {
       httpOnly: true,
+      domain: this.config.cookieDomain,
       sameSite,
       secure: isProduction,
       path: '/api/auth',
@@ -143,6 +145,7 @@ export class AuthController {
     // 3. Session Presence Cookie: long-lived (7d), non-HttpOnly, client UI hint
     response.cookie('has_session', '1', {
       httpOnly: false,
+      domain: this.config.cookieDomain,
       sameSite,
       secure: isProduction,
       path: '/',
@@ -156,18 +159,21 @@ export class AuthController {
 
     response.clearCookie('access_token', {
       httpOnly: true,
+      domain: this.config.cookieDomain,
       sameSite,
       secure: isProduction,
       path: '/',
     });
     response.clearCookie('refresh_token', {
       httpOnly: true,
+      domain: this.config.cookieDomain,
       sameSite,
       secure: isProduction,
       path: '/api/auth',
     });
     response.clearCookie('has_session', {
       httpOnly: false,
+      domain: this.config.cookieDomain,
       sameSite,
       secure: isProduction,
       path: '/',
