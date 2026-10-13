@@ -100,6 +100,7 @@ export const courts = pgTable(
       .references(() => venues.id, { onDelete: 'cascade' }),
     name: varchar('name', { length: 100 }).notNull(),
     isActive: boolean('is_active').notNull().default(true),
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },

@@ -15,6 +15,7 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\" \"*.{json,md,yml,yaml}\"",
     "prepare": "husky",
     "db:generate": "drizzle-kit generate",
+    "db:migration": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/database/seed.ts"
   },
