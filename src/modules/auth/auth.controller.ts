@@ -1,5 +1,7 @@
 import { Body, Controller, Get, Patch, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import type { Request, Response } from 'express';
+import type { Profile } from 'passport-google-oauth20';
 import { AuthService } from './auth.service';
 import { ChangePasswordDto, LoginDto, RegisterDto, UpdateProfileDto } from './dto/auth.dto';
 import { CurrentUser } from '../../common/current-user.decorator';
@@ -36,6 +38,24 @@ export class AuthController {
     const session = await this.auth.login(dto, userAgent, ipAddress);
     this.setAuthCookies(response, session);
     return { user: session.user };
+  }
+
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  googleLogin() {
+    // Passport redirects the request to Google.
+  }
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleCallback(
+    @Req() req: Request & { user: Profile },
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const { userAgent, ipAddress } = this.getClientInfo(req);
+    const session = await this.auth.loginWithGoogle(req.user, userAgent, ipAddress);
+    this.setAuthCookies(response, session);
+    response.redirect(this.config.frontendUrls[0]);
   }
 
   @Post('refresh')

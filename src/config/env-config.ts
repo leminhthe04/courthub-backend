@@ -50,6 +50,18 @@ export class EnvConfig {
     return this.readRequired('DATABASE_URL');
   }
 
+  get googleClientId(): string {
+    return this.readRequired('GOOGLE_CLIENT_ID');
+  }
+
+  get googleClientSecret(): string {
+    return this.readRequired('GOOGLE_CLIENT_SECRET');
+  }
+
+  get googleCallbackUrl(): string {
+    return this.readRequired('GOOGLE_CALLBACK_URL');
+  }
+
   get dbPoolMax(): number {
     return this.readInteger('DB_POOL_MAX', 10, 1);
   }

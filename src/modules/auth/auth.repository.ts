@@ -36,6 +36,15 @@ export class AuthRepository {
     return user;
   }
 
+  async findByGoogleSubject(googleSubject: string): Promise<AuthUserRecord | undefined> {
+    const [user] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.googleSubject, googleSubject))
+      .limit(1);
+    return user;
+  }
+
   async findByContactExcludingUser(
     userId: string,
     email: string | null,

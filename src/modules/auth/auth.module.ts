@@ -5,6 +5,7 @@ import { AuthController } from './auth.controller';
 import { AuthRepository } from './auth.repository';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
+import { GoogleStrategy } from './google.strategy';
 import { EnvConfigModule } from '../../config/env-config.module';
 import { EnvConfig } from '../../config/env-config';
 
@@ -22,7 +23,7 @@ import { EnvConfig } from '../../config/env-config';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthRepository, AuthService, JwtStrategy],
+  providers: [AuthRepository, AuthService, JwtStrategy, GoogleStrategy],
   exports: [AuthService, JwtStrategy],
 })
 export class AuthModule {}

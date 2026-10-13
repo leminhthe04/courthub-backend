@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import cookieParser from 'cookie-parser';
+import session from 'express-session';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -13,7 +14,24 @@ async function bootstrap() {
   console.log('CourtHub API application initialized');
   const config = app.get(EnvConfig);
 
+  if (config.nodeEnv === 'production') {
+    app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  }
+
   app.use(cookieParser());
+  app.use(
+    session({
+      secret: config.jwtSecret,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: config.nodeEnv === 'production',
+        maxAge: 10 * 60 * 1000,
+      },
+    }),
+  );
   app.enableCors({ origin: config.frontendUrls, credentials: true });
   app.setGlobalPrefix('api');
   app.useGlobalPipes(

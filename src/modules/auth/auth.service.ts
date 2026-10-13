@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { compare, hash } from 'bcryptjs';
+import type { Profile } from 'passport-google-oauth20';
 import type { AuthUser, JwtPayload } from '../../common/auth.types';
 import { ErrorCode } from '../../common/error-codes';
 import { createUuidV7 } from '../../common/uuid';
@@ -60,6 +61,48 @@ export class AuthService {
         message: 'Invalid login credentials',
       });
     }
+
+    return this.issueSession(user, userAgent, ipAddress);
+  }
+
+  async loginWithGoogle(profile: Profile, userAgent?: string, ipAddress?: string) {
+    const googleSubject = profile.id;
+    const email = profile.emails?.[0]?.value?.trim().toLowerCase();
+    const emailVerified = profile._json?.email_verified === true;
+
+    if (!googleSubject || !email || !emailVerified) {
+      throw new UnauthorizedException({
+        code: ErrorCode.AUTH_GOOGLE_EMAIL_NOT_VERIFIED,
+        message: 'A verified Google email is required',
+      });
+    }
+
+    let user = await this.repository.findByGoogleSubject(googleSubject);
+    if (!user) {
+      user = await this.repository.findByContact(email, null);
+    }
+
+    if (user) {
+      if (user.googleSubject !== googleSubject) {
+        user = await this.repository.updateUser(user.id, { googleSubject });
+      }
+      return this.issueSession(user, userAgent, ipAddress);
+    }
+
+    const displayName =
+      profile.displayName?.trim() ||
+      [profile.name?.givenName, profile.name?.familyName].filter(Boolean).join(' ') ||
+      email.split('@')[0];
+
+    user = await this.repository.createCustomer({
+      id: createUuidV7(),
+      fullName: displayName.slice(0, 120),
+      email,
+      phone: null,
+      googleSubject,
+      passwordHash: await hash(randomBytes(32).toString('hex'), 12),
+      role: 'CUSTOMER',
+    });
 
     return this.issueSession(user, userAgent, ipAddress);
   }
