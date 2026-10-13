@@ -62,6 +62,27 @@ export class EnvConfig {
     return this.readRequired('GOOGLE_CALLBACK_URL');
   }
 
+  get resendApiKey(): string {
+    return this.readRequired('RESEND_API_KEY');
+  }
+
+  get resendFromEmail(): string {
+    return this.readRequired('RESEND_FROM_EMAIL');
+  }
+
+  get resendReplyTo(): string {
+    return this.readRequired('RESEND_REPLY_TO');
+  }
+
+  get passwordResetTokenTtlMinutes(): number {
+    const rawValue = this.readRequired('PASSWORD_RESET_TOKEN_TTL_MINUTES');
+    const value = Number(rawValue);
+    if (!Number.isInteger(value) || value < 1 || value > 1440) {
+      throw new Error('PASSWORD_RESET_TOKEN_TTL_MINUTES must be an integer between 1 and 1440');
+    }
+    return value;
+  }
+
   get dbPoolMax(): number {
     return this.readInteger('DB_POOL_MAX', 10, 1);
   }

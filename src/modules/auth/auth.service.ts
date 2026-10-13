@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -12,7 +13,16 @@ import type { AuthUser, JwtPayload } from '../../common/auth.types';
 import { ErrorCode } from '../../common/error-codes';
 import { createUuidV7 } from '../../common/uuid';
 import { AuthRepository, type AuthUserRecord } from './auth.repository';
-import { ChangePasswordDto, LoginDto, RegisterDto, UpdateProfileDto } from './dto/auth.dto';
+import { EnvConfig } from '../../config/env-config';
+import { EmailService } from './email.service';
+import { PasswordResetRepository } from './password-reset.repository';
+import {
+  ConfirmPasswordResetDto,
+  LoginDto,
+  RegisterDto,
+  RequestPasswordResetDto,
+  UpdateProfileDto,
+} from './dto/auth.dto';
 
 const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -21,15 +31,18 @@ export class AuthService {
   constructor(
     private readonly repository: AuthRepository,
     private readonly jwt: JwtService,
+    @Optional() private readonly passwordResetRepository?: PasswordResetRepository,
+    @Optional() private readonly emailService?: EmailService,
+    @Optional() private readonly config?: EnvConfig,
   ) {}
 
   async register(dto: RegisterDto, userAgent?: string, ipAddress?: string) {
     const email = dto.email?.trim().toLowerCase() || null;
     const phone = dto.phone?.replace(/[\s().-]/g, '') || null;
-    if (!email && !phone) {
+    if (!email) {
       throw new ConflictException({
         code: ErrorCode.AUTH_CONTACT_REQUIRED,
-        message: 'Email or phone is required',
+        message: 'Email is required',
       });
     }
 
@@ -55,6 +68,12 @@ export class AuthService {
 
   async login(dto: LoginDto, userAgent?: string, ipAddress?: string) {
     const user = await this.repository.findByIdentifier(dto.identifier.trim());
+    if (user && !user.isActive) {
+      throw new UnauthorizedException({
+        code: ErrorCode.AUTH_ACCOUNT_INACTIVE,
+        message: 'Account is inactive',
+      });
+    }
     if (!user || !(await compare(dto.password, user.passwordHash))) {
       throw new UnauthorizedException({
         code: ErrorCode.AUTH_INVALID_CREDENTIALS,
@@ -83,6 +102,12 @@ export class AuthService {
     }
 
     if (user) {
+      if (!user.isActive) {
+        throw new UnauthorizedException({
+          code: ErrorCode.AUTH_ACCOUNT_INACTIVE,
+          message: 'Account is inactive',
+        });
+      }
       if (user.googleSubject !== googleSubject) {
         user = await this.repository.updateUser(user.id, { googleSubject });
       }
@@ -149,6 +174,14 @@ export class AuthService {
       });
     }
 
+    if (!user.isActive) {
+      await this.repository.revokeSession(session.id, 'REVOKED_BY_ADMIN');
+      throw new UnauthorizedException({
+        code: ErrorCode.AUTH_ACCOUNT_INACTIVE,
+        message: 'Account is inactive',
+      });
+    }
+
     // Token Rotation: invalidate previous session and issue new one
     await this.repository.revokeSession(session.id, 'ROTATED');
     return this.issueSession(user, userAgent, ipAddress);
@@ -185,14 +218,14 @@ export class AuthService {
       });
     }
 
-    const email = dto.email !== undefined ? dto.email.trim().toLowerCase() || null : user.email;
+    const email = dto.email.trim().toLowerCase();
     const phone = dto.phone !== undefined ? dto.phone.replace(/[\s().-]/g, '') || null : user.phone;
     const fullName = dto.fullName !== undefined ? dto.fullName.trim() : user.fullName;
 
-    if (!email && !phone) {
+    if (!email) {
       throw new ConflictException({
         code: ErrorCode.AUTH_CONTACT_REQUIRED,
-        message: 'Email or phone is required',
+        message: 'Email is required',
       });
     }
 
@@ -213,7 +246,18 @@ export class AuthService {
     return this.sanitize(updated);
   }
 
-  async changePassword(userId: string, dto: ChangePasswordDto) {
+  async requestPasswordReset(dto: RequestPasswordResetDto) {
+    const email = dto.email.trim().toLowerCase();
+    const user = await this.repository.findByContact(email, null);
+
+    if (user?.isActive) {
+      await this.createAndSendPasswordReset(user);
+    }
+
+    return { ok: true };
+  }
+
+  async requestPasswordResetForUser(userId: string) {
     const user = await this.repository.findById(userId);
     if (!user) {
       throw new UnauthorizedException({
@@ -222,24 +266,62 @@ export class AuthService {
       });
     }
 
-    if (!dto.currentPassword || !(await compare(dto.currentPassword, user.passwordHash))) {
-      throw new UnauthorizedException({
-        code: ErrorCode.AUTH_INVALID_CURRENT_PASSWORD,
-        message: 'Current password is incorrect',
+    if (!user.email) {
+      throw new BadRequestException({
+        code: ErrorCode.AUTH_PASSWORD_RESET_EMAIL_REQUIRED,
+        message: 'An email address is required to reset your password',
       });
     }
 
-    if (!dto.newPassword || dto.newPassword.length < 8) {
+    await this.createAndSendPasswordReset(user);
+    return { ok: true };
+  }
+
+  async confirmPasswordReset(dto: ConfirmPasswordResetDto) {
+    const tokenHash = this.hashToken(dto.token);
+    const token = await this.passwordResetRepository!.findValidByHash(tokenHash);
+    if (!token) {
       throw new BadRequestException({
-        code: ErrorCode.AUTH_PASSWORD_TOO_SHORT,
-        message: 'New password must be at least 8 characters',
+        code: ErrorCode.AUTH_PASSWORD_RESET_TOKEN_INVALID,
+        message: 'The password reset link is invalid or expired',
       });
     }
 
     const passwordHash = await hash(dto.newPassword, 12);
-    await this.repository.updateUser(userId, { passwordHash });
+    const consumed = await this.passwordResetRepository!.consumeAndResetPassword(
+      token.id,
+      token.userId,
+      passwordHash,
+    );
+    if (!consumed) {
+      throw new BadRequestException({
+        code: ErrorCode.AUTH_PASSWORD_RESET_TOKEN_INVALID,
+        message: 'The password reset link is invalid or expired',
+      });
+    }
 
     return { ok: true };
+  }
+
+  private async createAndSendPasswordReset(user: AuthUserRecord) {
+    if (!user.email) return;
+    const rawToken = randomBytes(32).toString('hex');
+    const now = new Date();
+    const config = this.config!;
+    const expiresAt = new Date(now.getTime() + config.passwordResetTokenTtlMinutes * 60 * 1000);
+    await this.passwordResetRepository!.revokeActiveForUser(user.id, now);
+    await this.passwordResetRepository!.create({
+      id: createUuidV7(),
+      userId: user.id,
+      tokenHash: this.hashToken(rawToken),
+      expiresAt,
+    });
+    const resetUrl = `${config.frontendUrls[0]}/en/reset-password?token=${encodeURIComponent(rawToken)}`;
+    await this.emailService!.sendPasswordResetEmail(
+      user.email,
+      resetUrl,
+      config.passwordResetTokenTtlMinutes,
+    );
   }
 
   private sanitize(user: AuthUserRecord): AuthUser {

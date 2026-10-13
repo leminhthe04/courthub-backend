@@ -3,7 +3,13 @@ import { AuthGuard } from '@nestjs/passport';
 import type { Request, Response } from 'express';
 import type { Profile } from 'passport-google-oauth20';
 import { AuthService } from './auth.service';
-import { ChangePasswordDto, LoginDto, RegisterDto, UpdateProfileDto } from './dto/auth.dto';
+import {
+  ConfirmPasswordResetDto,
+  LoginDto,
+  RegisterDto,
+  RequestPasswordResetDto,
+  UpdateProfileDto,
+} from './dto/auth.dto';
 import { CurrentUser } from '../../common/current-user.decorator';
 import type { AuthUser } from '../../common/auth.types';
 import { JwtAuthGuard } from '../../common/jwt-auth.guard';
@@ -93,10 +99,20 @@ export class AuthController {
     return { user: updated };
   }
 
-  @Patch('password')
+  @Post('password-reset/request')
+  requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
+    return this.auth.requestPasswordReset(dto);
+  }
+
+  @Post('password-reset/request-me')
   @UseGuards(JwtAuthGuard)
-  async changePassword(@CurrentUser() user: AuthUser, @Body() dto: ChangePasswordDto) {
-    return this.auth.changePassword(user.userId, dto);
+  requestPasswordResetForUser(@CurrentUser() user: AuthUser) {
+    return this.auth.requestPasswordResetForUser(user.userId);
+  }
+
+  @Post('password-reset/confirm')
+  confirmPasswordReset(@Body() dto: ConfirmPasswordResetDto) {
+    return this.auth.confirmPasswordReset(dto);
   }
 
   private setAuthCookies(

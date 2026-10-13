@@ -139,6 +139,18 @@ export class AuthRepository {
       .where(eq(sessions.id, sessionId));
   }
 
+  async revokeAllUserSessions(userId: string, reason: SessionRevokeReason): Promise<void> {
+    await this.db
+      .update(sessions)
+      .set({
+        isRevoked: true,
+        revokedAt: new Date(),
+        revokedReason: reason,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(sessions.userId, userId), eq(sessions.isRevoked, false)));
+  }
+
   async listUserSessions(userId: string): Promise<SessionRecord[]> {
     return this.db
       .select()

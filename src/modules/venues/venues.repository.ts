@@ -7,6 +7,7 @@ import {
   courts,
   venuePricingRules,
   venues,
+  users,
   type NewCourt,
   type NewVenue,
   type NewVenuePricingRule,
@@ -44,7 +45,7 @@ export class VenuesRepository {
   }
 
   listPublic(query: { search?: string; city?: string; categoryId?: string; sportType?: string }) {
-    const filters: SQL[] = [eq(venues.status, 'APPROVED')];
+    const filters: SQL[] = [eq(venues.status, 'APPROVED'), eq(users.isActive, true)];
     if (query.city) filters.push(ilike(venues.city, `%${query.city.trim()}%`));
     if (query.categoryId) filters.push(eq(venues.categoryId, query.categoryId));
     if (query.sportType) {
@@ -82,6 +83,7 @@ export class VenuesRepository {
       })
       .from(venues)
       .innerJoin(categories, eq(categories.id, venues.categoryId))
+      .innerJoin(users, eq(users.id, venues.ownerId))
       .where(and(...filters))
       .orderBy(desc(venues.createdAt));
   }
@@ -91,7 +93,8 @@ export class VenuesRepository {
       .select(this.venueSelectFields())
       .from(venues)
       .innerJoin(categories, eq(categories.id, venues.categoryId))
-      .where(and(eq(venues.id, id), eq(venues.status, 'APPROVED')))
+      .innerJoin(users, eq(users.id, venues.ownerId))
+      .where(and(eq(venues.id, id), eq(venues.status, 'APPROVED'), eq(users.isActive, true)))
       .limit(1);
     return venue;
   }
