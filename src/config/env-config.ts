@@ -42,11 +42,6 @@ export class EnvConfig {
     return urls;
   }
 
-  get cookieDomain(): string | undefined {
-    const value = this.values.COOKIE_DOMAIN?.trim();
-    return value || undefined;
-  }
-
   get jwtSecret(): string {
     return this.readRequired('JWT_SECRET');
   }
