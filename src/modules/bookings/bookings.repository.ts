@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, lt } from 'drizzle-orm';
 import { DATABASE, type Database } from '../../database/database.module';
 import {
   bookings,
@@ -43,11 +43,33 @@ export class BookingsRepository {
       .orderBy(asc(venuePricingRules.startTime));
   }
 
-  async create(values: NewBooking): Promise<BookingRecord> {
-    const [booking] = await this.db.transaction((tx) =>
-      tx.insert(bookings).values(values).returning(),
-    );
-    return booking;
+  async create(values: NewBooking): Promise<BookingRecord | undefined> {
+    return this.db.transaction(async (tx) => {
+      // Serialize booking attempts for the same court before checking the range.
+      await tx
+        .select({ id: courts.id })
+        .from(courts)
+        .where(eq(courts.id, values.courtId))
+        .for('update');
+
+      const [existingBooking] = await tx
+        .select({ id: bookings.id })
+        .from(bookings)
+        .where(
+          and(
+            eq(bookings.courtId, values.courtId),
+            inArray(bookings.status, ['PENDING', 'CONFIRMED']),
+            lt(bookings.startAt, values.endAt),
+            gt(bookings.endAt, values.startAt),
+          ),
+        )
+        .limit(1);
+
+      if (existingBooking) return undefined;
+
+      const [booking] = await tx.insert(bookings).values(values).returning();
+      return booking;
+    });
   }
 
   async findById(id: string): Promise<BookingRecord | undefined> {
@@ -63,6 +85,7 @@ export class BookingsRepository {
         courtName: courts.name,
         venueId: venues.id,
         venueName: venues.name,
+        venueAddress: venues.address,
         startAt: bookings.startAt,
         endAt: bookings.endAt,
         status: bookings.status,

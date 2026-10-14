@@ -46,6 +46,19 @@ export class EnvConfig {
     return this.readRequired('JWT_SECRET');
   }
 
+  get accessTokenTtlMinutes(): number {
+    return this.readRequiredInteger('ACCESS_TOKEN_TTL_MINUTES', 1, 1440);
+  }
+
+  get refreshTokenTtlDays(): number {
+    return this.readRequiredInteger('REFRESH_TOKEN_TTL_DAYS', 1, 365);
+  }
+
+  validateAuthTokenTtls(): void {
+    void this.accessTokenTtlMinutes;
+    void this.refreshTokenTtlDays;
+  }
+
   get databaseUrl(): string {
     return this.readRequired('DATABASE_URL');
   }
@@ -99,6 +112,19 @@ export class EnvConfig {
   private readInteger(name: string, fallback: number, minimum: number, maximum?: number): number {
     const rawValue = this.values[name]?.trim();
     const value = rawValue ? Number(rawValue) : fallback;
+
+    if (!Number.isInteger(value) || value < minimum || (maximum !== undefined && value > maximum)) {
+      const range =
+        maximum === undefined ? `at least ${minimum}` : `between ${minimum} and ${maximum}`;
+      throw new Error(`${name} must be an integer ${range}`);
+    }
+
+    return value;
+  }
+
+  private readRequiredInteger(name: string, minimum: number, maximum?: number): number {
+    const rawValue = this.readRequired(name);
+    const value = Number(rawValue);
 
     if (!Number.isInteger(value) || value < minimum || (maximum !== undefined && value > maximum)) {
       const range =

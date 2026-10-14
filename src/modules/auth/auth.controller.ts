@@ -127,7 +127,7 @@ export class AuthController {
       sameSite: 'lax',
       secure: isProduction,
       path: '/',
-      maxAge: 15 * 60 * 1000,
+      maxAge: this.config.accessTokenTtlMinutes * 60 * 1000,
     });
 
     // 2. Refresh Token: long-lived (7d), HttpOnly, scoped strictly to /api/auth
@@ -136,7 +136,7 @@ export class AuthController {
       sameSite: 'lax',
       secure: isProduction,
       path: '/api/auth',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: this.config.refreshTokenTtlDays * 24 * 60 * 60 * 1000,
     });
   }
 

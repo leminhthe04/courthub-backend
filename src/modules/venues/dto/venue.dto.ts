@@ -1,6 +1,7 @@
 import {
   IsArray,
   IsBoolean,
+  IsInt,
   IsIn,
   IsNumber,
   IsOptional,
@@ -8,6 +9,7 @@ import {
   IsUUID,
   Matches,
   MaxLength,
+  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -31,6 +33,17 @@ export class ListVenueDto {
   @IsOptional()
   @IsString()
   sportType?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(24)
+  limit?: number;
+
+  @IsOptional()
+  @IsString()
+  cursor?: string;
 }
 
 export class CreateVenueDto {
