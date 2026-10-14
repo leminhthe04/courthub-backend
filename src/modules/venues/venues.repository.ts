@@ -20,6 +20,7 @@ export type VenueRecord = typeof venues.$inferSelect & {
 };
 export type CourtRecord = typeof courts.$inferSelect;
 export type VenuePricingRuleRecord = typeof venuePricingRules.$inferSelect;
+export type PublicVenueCursor = { id: string };
 
 @Injectable()
 export class VenuesRepository {
@@ -44,7 +45,10 @@ export class VenuesRepository {
     };
   }
 
-  listPublic(query: { search?: string; city?: string; categoryId?: string; sportType?: string }) {
+  listPublic(
+    query: { search?: string; city?: string; categoryId?: string; sportType?: string },
+    options: { limit: number; cursor?: PublicVenueCursor },
+  ) {
     const filters: SQL[] = [eq(venues.status, 'APPROVED'), eq(users.isActive, true)];
     if (query.city) filters.push(ilike(venues.city, `%${query.city.trim()}%`));
     if (query.categoryId) filters.push(eq(venues.categoryId, query.categoryId));
@@ -67,6 +71,9 @@ export class VenuesRepository {
         )!,
       );
     }
+    if (options.cursor) {
+      filters.push(lt(venues.id, options.cursor.id));
+    }
 
     return this.db
       .select({
@@ -80,12 +87,14 @@ export class VenuesRepository {
         city: venues.city,
         description: venues.description,
         imageUrl: venues.imageUrl,
+        createdAt: venues.createdAt,
       })
       .from(venues)
       .innerJoin(categories, eq(categories.id, venues.categoryId))
       .innerJoin(users, eq(users.id, venues.ownerId))
       .where(and(...filters))
-      .orderBy(desc(venues.createdAt));
+      .orderBy(desc(venues.createdAt), desc(venues.id))
+      .limit(options.limit + 1); // get one extra record to check if there are more records after the current page
   }
 
   async findPublic(id: string): Promise<VenueRecord | undefined> {

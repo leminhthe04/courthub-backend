@@ -9,43 +9,12 @@ import type { AuthUser } from '../../common/auth.types';
 import { ErrorCode } from '../../common/error-codes';
 import { dayOfWeekFromDate } from '../../common/day-of-week';
 import { createUuidV7 } from '../../common/uuid';
-import { bookingWindowError } from './booking-rules';
+import { bookingWindowError, clockToMinutes, localDate, minutesInVietnam } from './booking-rules';
 import { BookingsRepository, type BookingRecord } from './bookings.repository';
 import { CreateBookingDto } from './dto/booking.dto';
 
-const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
-
 function normalizePhone(value: string) {
   return value.replace(/[\s().-]/g, '');
-}
-
-function localDate(value: Date) {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: VIETNAM_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(value);
-  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
-  return `${get('year')}-${get('month')}-${get('day')}`;
-}
-
-function minutesInVietnam(value: Date) {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: VIETNAM_TIME_ZONE,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(value);
-  const hour = Number(parts.find((part) => part.type === 'hour')?.value ?? 0);
-  const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? 0);
-  return hour * 60 + minute;
-}
-
-function clockToMinutes(value: string | null) {
-  if (!value) return null;
-  const [hour, minute] = value.slice(0, 5).split(':').map(Number);
-  return hour * 60 + minute;
 }
 
 function publicBooking(booking: BookingRecord) {
@@ -76,16 +45,6 @@ export class BookingsService {
     if (windowError) throw new BadRequestException(windowError);
 
     const durationMinutes = (end.getTime() - start.getTime()) / 60000;
-    if (
-      minutesInVietnam(start) % 30 !== 0 ||
-      minutesInVietnam(end) % 30 !== 0 ||
-      durationMinutes % 30 !== 0
-    ) {
-      throw new BadRequestException({
-        code: ErrorCode.BOOKING_SLOT_ALIGNMENT_REQUIRED,
-        message: 'Time must align to 30-minute slots',
-      });
-    }
 
     const court = await this.repository.findCourtForBooking(dto.courtId);
     if (!court) {
@@ -161,6 +120,12 @@ export class BookingsService {
         totalAmount,
         note: dto.note?.trim() || null,
       });
+      if (!created) {
+        throw new ConflictException({
+          code: ErrorCode.BOOKING_SLOT_ALREADY_BOOKED,
+          message: 'This time slot is already booked',
+        });
+      }
       return { booking: publicBooking(created) };
     } catch (error) {
       const code = (error as { code?: string }).code;

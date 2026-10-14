@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { validate as isUuid } from 'uuid';
 import { ErrorCode } from '../../common/error-codes';
 import { createUuidV7 } from '../../common/uuid';
 import {
@@ -14,9 +15,21 @@ import {
   UpdateCourtDto,
 } from './dto/venue.dto';
 import type { DayOfWeek } from '../../database/schema';
-import { VenuesRepository, type VenueRecord } from './venues.repository';
+import { VenuesRepository, type PublicVenueCursor, type VenueRecord } from './venues.repository';
 
 const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
+const DEFAULT_VENUE_PAGE_SIZE = 12;
+
+function decodeVenueCursor(value: string): PublicVenueCursor {
+  if (!isUuid(value)) {
+    throw new BadRequestException({
+      code: ErrorCode.BAD_REQUEST,
+      message: 'Invalid venue cursor',
+    });
+  }
+
+  return { id: value };
+}
 
 export function clockToMinutes(value: string | null) {
   if (!value) return null;
@@ -66,8 +79,19 @@ export function vietnamDayOfWeek(value: Date): DayOfWeek {
 export class VenuesService {
   constructor(private readonly repository: VenuesRepository) {}
 
-  listPublic(query: ListVenueDto) {
-    return this.repository.listPublic(query);
+  async listPublic(query: ListVenueDto) {
+    const limit = query.limit ?? DEFAULT_VENUE_PAGE_SIZE;
+    const cursor = query.cursor ? decodeVenueCursor(query.cursor) : undefined;
+    const rows = await this.repository.listPublic(query, { limit, cursor });
+    const hasNextPage = rows.length > limit;
+    const items = rows.slice(0, limit);
+    const lastItem = rows[limit - 1];
+
+    return {
+      items,
+      nextCursor: hasNextPage && lastItem ? lastItem.id : null,
+      hasNextPage,
+    };
   }
 
   async getPublic(id: string) {

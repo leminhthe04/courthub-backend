@@ -24,8 +24,6 @@ import {
   UpdateProfileDto,
 } from './dto/auth.dto';
 
-const REFRESH_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-
 @Injectable()
 export class AuthService {
   constructor(
@@ -339,7 +337,10 @@ export class AuthService {
     const sessionId = createUuidV7();
     const rawRefreshToken = randomBytes(32).toString('hex');
     const refreshTokenHash = this.hashToken(rawRefreshToken);
-    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
+    if (!this.config) {
+      throw new Error('EnvConfig is required to issue an authentication session');
+    }
+    const expiresAt = new Date(Date.now() + this.config.refreshTokenTtlDays * 24 * 60 * 60 * 1000);
 
     await this.repository.createSession({
       id: sessionId,
