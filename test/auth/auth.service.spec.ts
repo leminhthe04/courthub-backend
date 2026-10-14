@@ -6,6 +6,8 @@ import { createAuthUser } from '../helpers/auth.fixtures';
 import { mockResolved } from '../helpers/mock-http';
 
 describe('AuthService', () => {
+  const config = { refreshTokenTtlDays: 7 } as any;
+
   it('registers a customer with normalized contact information', async () => {
     const repository = {
       findByContact: mockResolved(undefined),
@@ -15,7 +17,7 @@ describe('AuthService', () => {
       createSession: mockResolved(undefined),
     };
     const jwt = { sign: jest.fn().mockReturnValue('access-token') };
-    const service = new AuthService(repository as any, jwt as any);
+    const service = new AuthService(repository as any, jwt as any, undefined, undefined, config);
     const result = await service.register({
       fullName: ' User ',
       email: ' USER@EXAMPLE.COM ',
@@ -35,7 +37,13 @@ describe('AuthService', () => {
       findByContact: mockResolved(createAuthUser()),
       findByIdentifier: mockResolved(createAuthUser({ isActive: false })),
     };
-    const service = new AuthService(repository as any, {} as JwtService);
+    const service = new AuthService(
+      repository as any,
+      {} as JwtService,
+      undefined,
+      undefined,
+      config,
+    );
     await expect(
       service.register({
         fullName: 'User',
@@ -55,7 +63,13 @@ describe('AuthService', () => {
       findByContactExcludingUser: mockResolved(undefined),
       updateUser: mockResolved({ ...user, fullName: 'New Name' }),
     };
-    const service = new AuthService(repository as any, {} as JwtService);
+    const service = new AuthService(
+      repository as any,
+      {} as JwtService,
+      undefined,
+      undefined,
+      config,
+    );
     await expect(
       service.updateProfile(user.id, {
         fullName: ' New Name ',
@@ -70,6 +84,9 @@ describe('AuthService', () => {
         findByContactExcludingUser: mockResolved(createAuthUser({ id: 'other' })),
       } as any,
       {} as JwtService,
+      undefined,
+      undefined,
+      config,
     );
     await expect(
       duplicate.updateProfile(user.id, { fullName: 'Name', email: 'other@example.com' } as any),

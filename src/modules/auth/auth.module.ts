@@ -18,10 +18,13 @@ import { EnvConfig } from '../../config/env-config';
     JwtModule.registerAsync({
       imports: [EnvConfigModule],
       inject: [EnvConfig],
-      useFactory: (config: EnvConfig) => ({
-        secret: config.jwtSecret,
-        signOptions: { expiresIn: '15m' },
-      }),
+      useFactory: (config: EnvConfig) => {
+        config.validateAuthTokenTtls();
+        return {
+          secret: config.jwtSecret,
+          signOptions: { expiresIn: `${config.accessTokenTtlMinutes}m` },
+        };
+      },
     }),
   ],
   controllers: [AuthController],

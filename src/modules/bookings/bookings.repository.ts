@@ -85,6 +85,7 @@ export class BookingsRepository {
         courtName: courts.name,
         venueId: venues.id,
         venueName: venues.name,
+        venueAddress: venues.address,
         startAt: bookings.startAt,
         endAt: bookings.endAt,
         status: bookings.status,
