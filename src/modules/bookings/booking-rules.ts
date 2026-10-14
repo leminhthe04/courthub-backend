@@ -4,11 +4,18 @@ const VIETNAM_TIME_ZONE = 'Asia/Ho_Chi_Minh';
 
 // Booking slots are aligned to 30-minute boundaries in Vietnam time.
 
-function localDate(value: Date) {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: VIETNAM_TIME_ZONE }).format(value);
+export function localDate(value: Date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: VIETNAM_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(value);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
-function minutesInVietnam(value: Date) {
+export function minutesInVietnam(value: Date) {
   const parts = new Intl.DateTimeFormat('en-GB', {
     timeZone: VIETNAM_TIME_ZONE,
     hour: '2-digit',
@@ -17,6 +24,12 @@ function minutesInVietnam(value: Date) {
   }).formatToParts(value);
   const hour = Number(parts.find((part) => part.type === 'hour')?.value ?? 0);
   const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? 0);
+  return hour * 60 + minute;
+}
+
+export function clockToMinutes(value: string | null) {
+  if (!value) return null;
+  const [hour, minute] = value.slice(0, 5).split(':').map(Number);
   return hour * 60 + minute;
 }
 
