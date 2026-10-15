@@ -15,10 +15,10 @@ describe('VenuesController', () => {
     const controller = new VenuesController(service as any);
     const user = createAuthUser();
 
-    await expect(controller.list({ city: 'Vinh Long' } as any)).resolves.toEqual(['venues']);
+    await expect(controller.list({ province: 'Vinh Long' } as any)).resolves.toEqual(['venues']);
     await expect(controller.get('v1')).resolves.toBe('venue');
     await expect(controller.schedule('v1', '2026-10-14', user)).resolves.toBe('schedule');
-    expect(service.listPublic).toHaveBeenCalledWith({ city: 'Vinh Long' });
+    expect(service.listPublic).toHaveBeenCalledWith({ province: 'Vinh Long' });
     expect(service.getSchedule).toHaveBeenCalledWith('v1', '2026-10-14', user.userId);
   });
 

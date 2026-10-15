@@ -91,7 +91,10 @@ export const venues = pgTable(
       .references(() => categories.id, { onDelete: 'restrict' }),
     name: varchar('name', { length: 160 }).notNull(),
     address: varchar('address', { length: 255 }).notNull(),
-    city: varchar('city', { length: 100 }).notNull(),
+    ward: varchar('ward', { length: 150 }).notNull(),
+    province: varchar('province', { length: 100 }).notNull(),
+    wardCode: varchar('ward_code', { length: 20 }).notNull(),
+    provinceCode: varchar('province_code', { length: 20 }).notNull(),
     description: text('description'),
     imageUrl: text('image_url'),
     status: venueStatusEnum('status').notNull().default('PENDING'),
@@ -101,7 +104,7 @@ export const venues = pgTable(
   (table) => [
     index('venues_owner_id_idx').on(table.ownerId),
     index('venues_category_id_idx').on(table.categoryId),
-    index('venues_search_idx').on(table.status, table.city),
+    index('venues_search_idx').on(table.status, table.province),
   ],
 );
 

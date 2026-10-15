@@ -36,7 +36,10 @@ export class VenuesRepository {
       categorySlug: categories.slug,
       name: venues.name,
       address: venues.address,
-      city: venues.city,
+      province: venues.province,
+      ward: venues.ward,
+      wardCode: venues.wardCode,
+      provinceCode: venues.provinceCode,
       description: venues.description,
       imageUrl: venues.imageUrl,
       status: venues.status,
@@ -54,7 +57,12 @@ export class VenuesRepository {
     if (query.search) {
       const search = `%${query.search.trim()}%`;
       filters.push(
-        or(ilike(venues.name, search), ilike(venues.address, search), ilike(venues.city, search))!,
+        or(
+          ilike(venues.name, search),
+          ilike(venues.address, search),
+          ilike(venues.ward, search),
+          ilike(venues.province, search),
+        )!,
       );
     }
     if (options.cursor) {
@@ -70,7 +78,10 @@ export class VenuesRepository {
         categoryName: categories.name,
         categorySlug: categories.slug,
         address: venues.address,
-        city: venues.city,
+        province: venues.province,
+        ward: venues.ward,
+        wardCode: venues.wardCode,
+        provinceCode: venues.provinceCode,
         description: venues.description,
         imageUrl: venues.imageUrl,
         createdAt: venues.createdAt,

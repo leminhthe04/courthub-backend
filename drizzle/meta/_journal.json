@@ -29,6 +29,20 @@
       "when": 1792029144459,
       "tag": "0003_add_payos_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792051732954,
+      "tag": "0004_add_venue_location_fields",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792052155945,
+      "tag": "0005_require_venue_location_fields",
+      "breakpoints": true
     }
   ]
 }

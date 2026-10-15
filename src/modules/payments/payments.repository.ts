@@ -34,7 +34,8 @@ export class PaymentsRepository {
         venueId: venues.id,
         venueName: venues.name,
         venueAddress: venues.address,
-        venueCity: venues.city,
+        venueWard: venues.ward,
+        venueProvince: venues.province,
       })
       .from(payments)
       .innerJoin(bookings, eq(bookings.id, payments.bookingId))

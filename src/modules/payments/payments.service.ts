@@ -135,7 +135,8 @@ export class PaymentsService {
     venueId: string;
     venueName: string;
     venueAddress: string;
-    venueCity: string;
+    venueWard: string;
+    venueProvince: string;
   }) {
     return {
       paymentId: payment.payment.id,
@@ -159,7 +160,8 @@ export class PaymentsService {
         id: payment.venueId,
         name: payment.venueName,
         address: payment.venueAddress,
-        city: payment.venueCity,
+        ward: payment.venueWard,
+        province: payment.venueProvince,
       },
     };
   }
