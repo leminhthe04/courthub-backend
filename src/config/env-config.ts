@@ -1,6 +1,6 @@
 import 'dotenv/config';
 
-export type NodeEnvironment = 'development' | 'test' | 'production';
+export type NodeEnvironment = 'development' | 'development_ngrok' | 'test' | 'production';
 
 /**
  * The single source of truth for backend environment variables.
@@ -17,8 +17,13 @@ export class EnvConfig {
 
   get nodeEnv(): NodeEnvironment {
     const value = this.values.NODE_ENV ?? 'development';
-    if (value !== 'development' && value !== 'test' && value !== 'production') {
-      throw new Error('NODE_ENV must be one of: development, test, production');
+    if (
+      value !== 'development' &&
+      value !== 'development_ngrok' &&
+      value !== 'test' &&
+      value !== 'production'
+    ) {
+      throw new Error('NODE_ENV must be one of: development, development_ngrok, test, production');
     }
 
     return value;
@@ -94,6 +99,45 @@ export class EnvConfig {
       throw new Error('PASSWORD_RESET_TOKEN_TTL_MINUTES must be an integer between 1 and 1440');
     }
     return value;
+  }
+
+  get cookieOptions(): { sameSite: 'lax' | 'none'; secure: boolean } {
+    if (this.nodeEnv === 'development_ngrok') {
+      return { sameSite: 'none', secure: true };
+    }
+
+    return {
+      sameSite: 'lax',
+      secure: this.nodeEnv === 'production',
+    };
+  }
+
+  get payosClientId(): string {
+    return this.readRequired('PAYOS_CLIENT_ID');
+  }
+
+  get payosApiKey(): string {
+    return this.readRequired('PAYOS_API_KEY');
+  }
+
+  get payosChecksumKey(): string {
+    return this.readRequired('PAYOS_CHECKSUM_KEY');
+  }
+
+  get payosReturnUrl(): string {
+    return this.readRequired('PAYOS_RETURN_URL');
+  }
+
+  get payosCancelUrl(): string {
+    return this.readRequired('PAYOS_CANCEL_URL');
+  }
+
+  get payosWebhookUrl(): string {
+    return this.readRequired('PAYOS_WEBHOOK_URL');
+  }
+
+  get paymentHoldMinutes(): number {
+    return this.readRequiredInteger('PAYMENT_HOLD_MINUTES', 1, 60);
   }
 
   get dbPoolMax(): number {

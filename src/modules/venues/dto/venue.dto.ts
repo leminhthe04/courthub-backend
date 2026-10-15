@@ -23,16 +23,8 @@ export class ListVenueDto {
   search?: string;
 
   @IsOptional()
-  @IsString()
-  city?: string;
-
-  @IsOptional()
   @IsUUID()
   categoryId?: string;
-
-  @IsOptional()
-  @IsString()
-  sportType?: string;
 
   @IsOptional()
   @Type(() => Number)
@@ -60,7 +52,19 @@ export class CreateVenueDto {
 
   @IsString()
   @MaxLength(100)
-  city!: string;
+  province!: string;
+
+  @IsString()
+  @MaxLength(150)
+  ward!: string;
+
+  @IsString()
+  @MaxLength(20)
+  wardCode!: string;
+
+  @IsString()
+  @MaxLength(20)
+  provinceCode!: string;
 
   @IsOptional()
   @IsString()

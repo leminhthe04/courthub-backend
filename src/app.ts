@@ -14,7 +14,7 @@ async function bootstrap() {
   console.log('CourtHub API application initialized');
   const config = app.get(EnvConfig);
 
-  if (config.nodeEnv === 'production') {
+  if (config.nodeEnv === 'production' || config.nodeEnv === 'development_ngrok') {
     app.getHttpAdapter().getInstance().set('trust proxy', 1);
   }
 
@@ -26,8 +26,8 @@ async function bootstrap() {
       saveUninitialized: false,
       cookie: {
         httpOnly: true,
-        sameSite: 'lax',
-        secure: config.nodeEnv === 'production',
+        sameSite: config.cookieOptions.sameSite,
+        secure: config.cookieOptions.secure,
         maxAge: 10 * 60 * 1000,
       },
     }),

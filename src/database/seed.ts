@@ -174,6 +174,165 @@ const pricingSlots = [
 ] as const;
 
 type SeedDatabase = Pick<NodePgDatabase<typeof schema>, 'select' | 'insert'>;
+type SeedVenueValues = Omit<schema.NewVenue, 'ward' | 'wardCode' | 'provinceCode'>;
+type LocationProvince = { code: string; name: string };
+type LocationWard = { code: string; name: string; type: string };
+
+const locationApi = 'https://www.tinhthanhpho.com/api/v1';
+let seedProvinces: LocationProvince[] | undefined;
+const seedWards = new Map<string, LocationWard[]>();
+const normalizeLocation = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/gi, 'd')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+const provinceAliases: Record<string, string> = {
+  'ho chi minh city': 'ho chi minh',
+  saigon: 'ho chi minh',
+  hanoi: 'ha noi',
+  'nha trang': 'khanh hoa',
+  'vung tau': 'ho chi minh',
+  'thu dau mot': 'ho chi minh',
+  'tan uyen': 'ho chi minh',
+  hue: 'hue',
+};
+const seedLocationOverrides: Record<
+  string,
+  { ward: string; wardCode: string; province: string; provinceCode: string }
+> = {
+  '214 nguyen tat thanh phuong thanh binh': {
+    ward: 'Phường Hải Châu',
+    wardCode: '20242',
+    province: 'Đà Nẵng',
+    provinceCode: '48',
+  },
+  '28 chi lang phuong gia hoi': {
+    ward: 'Phường Phú Xuân',
+    wardCode: '19753',
+    province: 'Huế',
+    provinceCode: '46',
+  },
+  '2 thuy van phuong thang tam': {
+    ward: 'Phường Tam Thắng',
+    wardCode: '26526',
+    province: 'Hồ Chí Minh',
+    provinceCode: '79',
+  },
+  '19 hoang hoa tham phuong 2': {
+    ward: 'Phường Vũng Tàu',
+    wardCode: '26506',
+    province: 'Hồ Chí Minh',
+    provinceCode: '79',
+  },
+  '63 le hong phong phuong 7': {
+    ward: 'Phường Vũng Tàu',
+    wardCode: '26506',
+    province: 'Hồ Chí Minh',
+    provinceCode: '79',
+  },
+  '38 yersin phu cuong': {
+    ward: 'Phường Thủ Dầu Một',
+    wardCode: '25747',
+    province: 'Hồ Chí Minh',
+    provinceCode: '79',
+  },
+  '121 dai lo binh duong phu hoa': {
+    ward: 'Phường Thủ Dầu Một',
+    wardCode: '25747',
+    province: 'Hồ Chí Minh',
+    provinceCode: '79',
+  },
+  '17 phu loi phu hoa': {
+    ward: 'Phường Phú Lợi',
+    wardCode: '25750',
+    province: 'Hồ Chí Minh',
+    provinceCode: '79',
+  },
+  '52 dt747 uyen hung': {
+    ward: 'Phường Tân Uyên',
+    wardCode: '25888',
+    province: 'Hồ Chí Minh',
+    provinceCode: '79',
+  },
+  '10 pham thai buong phuong 4': {
+    ward: 'Phường Long Châu',
+    wardCode: '29551',
+    province: 'Vĩnh Long',
+    provinceCode: '86',
+  },
+  '45 quoc lo 53 thi tran long ho': {
+    ward: 'Xã Long Hồ',
+    wardCode: '29602',
+    province: 'Vĩnh Long',
+    provinceCode: '86',
+  },
+  '22 tong phuoc hiep phuong 1': {
+    ward: 'Phường Long Châu',
+    wardCode: '29551',
+    province: 'Vĩnh Long',
+    provinceCode: '86',
+  },
+  '78 nguyen van thiet phuong 3': {
+    ward: 'Phường Long Châu',
+    wardCode: '29551',
+    province: 'Vĩnh Long',
+    provinceCode: '86',
+  },
+  '31 2 thang 9 phuong 1': {
+    ward: 'Phường Long Châu',
+    wardCode: '29551',
+    province: 'Vĩnh Long',
+    provinceCode: '86',
+  },
+};
+
+async function resolveSeedLocation(provinceValue: string, address: string) {
+  const override = seedLocationOverrides[normalizeLocation(address)];
+  if (override) return override;
+  if (!seedProvinces) {
+    const response = await fetch(`${locationApi}/new-provinces?limit=100&page=1`);
+    seedProvinces = ((await response.json()) as { data: LocationProvince[] }).data;
+  }
+  const provinceKey =
+    provinceAliases[normalizeLocation(provinceValue)] ?? normalizeLocation(provinceValue);
+  const province = seedProvinces.find((item) => normalizeLocation(item.name).includes(provinceKey));
+  if (!province) throw new Error(`Unable to resolve seed province: ${provinceValue}`);
+  let wards = seedWards.get(province.code);
+  if (!wards) {
+    const response = await fetch(
+      `${locationApi}/new-provinces/${province.code}/wards?limit=500&page=1`,
+    );
+    wards = ((await response.json()) as { data: LocationWard[] }).data;
+    seedWards.set(province.code, wards);
+  }
+  const parts = address.split(',').map((part) => part.trim());
+  const index = parts.findIndex((part) =>
+    wards!.some(
+      (ward) =>
+        normalizeLocation(part) === normalizeLocation(ward.name) ||
+        normalizeLocation(part) === normalizeLocation(`${ward.type} ${ward.name}`),
+    ),
+  );
+  const ward =
+    index >= 0
+      ? wards.find(
+          (item) =>
+            normalizeLocation(parts[index]) === normalizeLocation(item.name) ||
+            normalizeLocation(parts[index]) === normalizeLocation(`${item.type} ${item.name}`),
+        )
+      : undefined;
+  if (!ward) throw new Error(`Unable to resolve seed ward: ${address}`);
+  return {
+    address: parts.slice(0, index).join(', '),
+    ward: `${ward.type} ${ward.name}`,
+    wardCode: ward.code,
+    province: province.name,
+    provinceCode: province.code,
+  };
+}
 
 async function findOrCreateCategory(
   db: SeedDatabase,
@@ -207,7 +366,7 @@ async function findOrCreateUser(db: SeedDatabase, values: schema.NewUser) {
   return created;
 }
 
-async function findOrCreateVenue(db: SeedDatabase, values: schema.NewVenue) {
+async function findOrCreateVenue(db: SeedDatabase, values: SeedVenueValues) {
   const [existing] = await db
     .select()
     .from(schema.venues)
@@ -216,7 +375,11 @@ async function findOrCreateVenue(db: SeedDatabase, values: schema.NewVenue) {
 
   if (existing) return existing;
 
-  const [created] = await db.insert(schema.venues).values(values).returning();
+  const location = await resolveSeedLocation(values.province, values.address);
+  const [created] = await db
+    .insert(schema.venues)
+    .values({ ...values, ...location })
+    .returning();
   return created;
 }
 
@@ -327,7 +490,7 @@ async function seed() {
         categoryId: categories.get('pickleball')!.id,
         name: 'Relaxar',
         address: '122A Tân Quới Hưng, Phường Long Châu',
-        city: 'Vĩnh Long',
+        province: 'Vĩnh Long',
         description: 'Pickleball courts near the city centre.',
         status: 'APPROVED',
       });
@@ -352,7 +515,7 @@ async function seed() {
         });
 
         for (let venueIndex = 0; venueIndex < definition.venues.length; venueIndex += 1) {
-          const [name, address, city, categorySlug] = definition.venues[venueIndex];
+          const [name, address, province, categorySlug] = definition.venues[venueIndex];
           const category = categories.get(categorySlug);
           if (!category) throw new Error(`Missing category: ${categorySlug}`);
 
@@ -362,7 +525,7 @@ async function seed() {
             categoryId: category.id,
             name,
             address,
-            city,
+            province,
             description: `${name} offers bookable ${category.name.toLowerCase()} facilities.`,
             status: 'APPROVED',
           });
