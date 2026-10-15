@@ -4,6 +4,7 @@ import { DATABASE, type Database } from '../../database/database.module';
 import {
   bookings,
   courts,
+  payments,
   venuePricingRules,
   venues,
   type Booking,
@@ -58,7 +59,7 @@ export class BookingsRepository {
         .where(
           and(
             eq(bookings.courtId, values.courtId),
-            inArray(bookings.status, ['PENDING', 'CONFIRMED']),
+            inArray(bookings.status, ['PENDING', 'AWAITING_PAYMENT', 'CONFIRMED']),
             lt(bookings.startAt, values.endAt),
             gt(bookings.endAt, values.startAt),
           ),
@@ -77,6 +78,15 @@ export class BookingsRepository {
     return booking;
   }
 
+  async cancel(id: string) {
+    const [booking] = await this.db
+      .update(bookings)
+      .set({ status: 'CANCELLED', updatedAt: new Date() })
+      .where(eq(bookings.id, id))
+      .returning();
+    return booking;
+  }
+
   listMine(userId: string) {
     return this.db
       .select({
@@ -91,10 +101,15 @@ export class BookingsRepository {
         status: bookings.status,
         totalAmount: bookings.totalAmount,
         createdAt: bookings.createdAt,
+        paymentId: payments.id,
+        paymentStatus: payments.status,
+        paymentCheckoutUrl: payments.checkoutUrl,
+        paymentExpiresAt: payments.expiresAt,
       })
       .from(bookings)
       .innerJoin(courts, eq(courts.id, bookings.courtId))
       .innerJoin(venues, eq(venues.id, courts.venueId))
+      .leftJoin(payments, eq(payments.bookingId, bookings.id))
       .where(eq(bookings.customerId, userId))
       .orderBy(desc(bookings.startAt));
   }
@@ -113,6 +128,7 @@ export class BookingsRepository {
         contactPhone: bookings.contactPhone,
         startAt: bookings.startAt,
         endAt: bookings.endAt,
+        createdAt: bookings.createdAt,
         status: bookings.status,
         totalAmount: bookings.totalAmount,
       })

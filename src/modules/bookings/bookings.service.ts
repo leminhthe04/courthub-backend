@@ -12,6 +12,7 @@ import { createUuidV7 } from '../../common/uuid';
 import { bookingWindowError, clockToMinutes, localDate, minutesInVietnam } from './booking-rules';
 import { BookingsRepository, type BookingRecord } from './bookings.repository';
 import { CreateBookingDto } from './dto/booking.dto';
+import { PaymentsService } from '../payments/payments.service';
 
 function normalizePhone(value: string) {
   return value.replace(/[\s().-]/g, '');
@@ -36,7 +37,10 @@ function publicBooking(booking: BookingRecord) {
 
 @Injectable()
 export class BookingsService {
-  constructor(private readonly repository: BookingsRepository) {}
+  constructor(
+    private readonly repository: BookingsRepository,
+    private readonly payments: PaymentsService,
+  ) {}
 
   async create(dto: CreateBookingDto, user: AuthUser | null) {
     const start = new Date(dto.startAt);
@@ -116,7 +120,7 @@ export class BookingsService {
         contactPhone,
         startAt: start,
         endAt: end,
-        status: 'CONFIRMED',
+        status: 'AWAITING_PAYMENT',
         totalAmount,
         note: dto.note?.trim() || null,
       });
@@ -126,7 +130,20 @@ export class BookingsService {
           message: 'This time slot is already booked',
         });
       }
-      return { booking: publicBooking(created) };
+      try {
+        const payment = await this.payments.createForBooking({
+          bookingId: created.id,
+          amount: totalAmount,
+          description: `CourtHub booking ${created.id.slice(0, 8)}`,
+          contactName: created.contactName,
+          contactEmail: created.contactEmail,
+          contactPhone: created.contactPhone,
+        });
+        return { booking: publicBooking(created), payment: payment.payment };
+      } catch (paymentError) {
+        await this.repository.cancel(created.id);
+        throw paymentError;
+      }
     } catch (error) {
       const code = (error as { code?: string }).code;
       if (code === '23P01' || code === '23505') {

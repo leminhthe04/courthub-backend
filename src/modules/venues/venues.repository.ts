@@ -36,7 +36,10 @@ export class VenuesRepository {
       categorySlug: categories.slug,
       name: venues.name,
       address: venues.address,
-      city: venues.city,
+      province: venues.province,
+      ward: venues.ward,
+      wardCode: venues.wardCode,
+      provinceCode: venues.provinceCode,
       description: venues.description,
       imageUrl: venues.imageUrl,
       status: venues.status,
@@ -46,28 +49,19 @@ export class VenuesRepository {
   }
 
   listPublic(
-    query: { search?: string; city?: string; categoryId?: string; sportType?: string },
+    query: { search?: string; categoryId?: string },
     options: { limit: number; cursor?: PublicVenueCursor },
   ) {
     const filters: SQL[] = [eq(venues.status, 'APPROVED'), eq(users.isActive, true)];
-    if (query.city) filters.push(ilike(venues.city, `%${query.city.trim()}%`));
     if (query.categoryId) filters.push(eq(venues.categoryId, query.categoryId));
-    if (query.sportType) {
-      filters.push(
-        or(
-          ilike(categories.name, `%${query.sportType.trim()}%`),
-          ilike(categories.slug, `%${query.sportType.trim()}%`),
-        )!,
-      );
-    }
     if (query.search) {
       const search = `%${query.search.trim()}%`;
       filters.push(
         or(
           ilike(venues.name, search),
           ilike(venues.address, search),
-          ilike(venues.city, search),
-          ilike(categories.name, search),
+          ilike(venues.ward, search),
+          ilike(venues.province, search),
         )!,
       );
     }
@@ -84,7 +78,10 @@ export class VenuesRepository {
         categoryName: categories.name,
         categorySlug: categories.slug,
         address: venues.address,
-        city: venues.city,
+        province: venues.province,
+        ward: venues.ward,
+        wardCode: venues.wardCode,
+        provinceCode: venues.provinceCode,
         description: venues.description,
         imageUrl: venues.imageUrl,
         createdAt: venues.createdAt,
@@ -195,7 +192,7 @@ export class VenuesRepository {
           inArray(bookings.courtId, courtIds),
           lt(bookings.startAt, dayEnd),
           gt(bookings.endAt, dayStart),
-          or(eq(bookings.status, 'PENDING'), eq(bookings.status, 'CONFIRMED')),
+          inArray(bookings.status, ['PENDING', 'AWAITING_PAYMENT', 'CONFIRMED']),
         ),
       );
   }
@@ -253,7 +250,7 @@ export class VenuesRepository {
         and(
           eq(bookings.courtId, courtId),
           gt(bookings.startAt, now),
-          or(eq(bookings.status, 'PENDING'), eq(bookings.status, 'CONFIRMED')),
+          inArray(bookings.status, ['PENDING', 'AWAITING_PAYMENT', 'CONFIRMED']),
         ),
       )
       .limit(1);

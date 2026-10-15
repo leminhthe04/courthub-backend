@@ -38,7 +38,10 @@ describe('VenuesService', () => {
       name: 'Arena',
       categoryId: 'cat-1',
       address: 'Address',
-      city: 'Vinh Long',
+      province: 'Vinh Long',
+      ward: 'Phường Long Châu',
+      wardCode: '29551',
+      provinceCode: '86',
     });
     expect(result.status).toBe('APPROVED');
     expect(result.courts).toEqual([]);
