@@ -18,9 +18,17 @@ export const userRoleEnum = pgEnum('user_role', ['CUSTOMER', 'PARTNER', 'ADMIN']
 export const venueStatusEnum = pgEnum('venue_status', ['PENDING', 'APPROVED', 'REJECTED']);
 export const bookingStatusEnum = pgEnum('booking_status', [
   'PENDING',
+  'AWAITING_PAYMENT',
   'CONFIRMED',
   'CANCELLED',
   'REJECTED',
+]);
+export const paymentStatusEnum = pgEnum('payment_status', [
+  'PENDING',
+  'PAID',
+  'CANCELLED',
+  'EXPIRED',
+  'FAILED',
 ]);
 export const sessionRevokeReasonEnum = pgEnum('session_revoke_reason', [
   'LOGOUT',
@@ -167,6 +175,30 @@ export const bookings = pgTable(
   ],
 );
 
+export const payments = pgTable(
+  'payments',
+  {
+    id: uuid('id').primaryKey(),
+    bookingId: uuid('booking_id')
+      .notNull()
+      .references(() => bookings.id, { onDelete: 'cascade' }),
+    payosOrderCode: varchar('payos_order_code', { length: 32 }).notNull(),
+    amount: numeric('amount', { precision: 12, scale: 2, mode: 'number' }).notNull(),
+    status: paymentStatusEnum('status').notNull().default('PENDING'),
+    checkoutUrl: text('checkout_url').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    paidAt: timestamp('paid_at', { withTimezone: true }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('payments_booking_unique').on(table.bookingId),
+    uniqueIndex('payments_payos_order_code_unique').on(table.payosOrderCode),
+    index('payments_status_expires_idx').on(table.status, table.expiresAt),
+  ],
+);
+
 export const sessions = pgTable(
   'sessions',
   {
@@ -243,6 +275,8 @@ export type VenuePricingRule = typeof venuePricingRules.$inferSelect;
 export type NewVenuePricingRule = typeof venuePricingRules.$inferInsert;
 export type Booking = typeof bookings.$inferSelect;
 export type NewBooking = typeof bookings.$inferInsert;
+export type Payment = typeof payments.$inferSelect;
+export type NewPayment = typeof payments.$inferInsert;
 export type Session = typeof sessions.$inferSelect;
 export type NewSession = typeof sessions.$inferInsert;
 export type PartnerRequest = typeof partnerRequests.$inferSelect;
@@ -250,7 +284,8 @@ export type NewPartnerRequest = typeof partnerRequests.$inferInsert;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type NewPasswordResetToken = typeof passwordResetTokens.$inferInsert;
 export type UserRole = 'CUSTOMER' | 'PARTNER' | 'ADMIN';
-export type BookingStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'REJECTED';
+export type BookingStatus = 'PENDING' | 'AWAITING_PAYMENT' | 'CONFIRMED' | 'CANCELLED' | 'REJECTED';
+export type PaymentStatus = 'PENDING' | 'PAID' | 'CANCELLED' | 'EXPIRED' | 'FAILED';
 export type SessionRevokeReason = 'LOGOUT' | 'ROTATED' | 'EXPIRED' | 'REVOKED_BY_ADMIN';
 export type PartnerRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 export type DayOfWeek = (typeof dayOfWeekEnum.enumValues)[number];

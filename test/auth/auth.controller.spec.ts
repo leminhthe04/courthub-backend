@@ -16,7 +16,10 @@ describe('AuthController', () => {
       confirmPasswordReset: mockResolved({ ok: true }),
       loginWithGoogle: jest.fn(),
     };
-    const config = { frontendUrls: ['http://localhost:3000'] };
+    const config = {
+      frontendUrls: ['http://localhost:3000'],
+      cookieOptions: { sameSite: 'lax', secure: false },
+    };
     const controller = new AuthController(auth as any, config as any);
     const response = createMockResponse();
     const request = { headers: { 'user-agent': 'Jest' }, ip: '127.0.0.1', cookies: {} } as any;
@@ -44,7 +47,10 @@ describe('AuthController', () => {
     };
     const controller = new AuthController(
       auth as any,
-      { frontendUrls: ['http://localhost:3000'] } as any,
+      {
+        frontendUrls: ['http://localhost:3000'],
+        cookieOptions: { sameSite: 'lax', secure: false },
+      } as any,
     );
     const response = createMockResponse();
     const user = createAuthUser();

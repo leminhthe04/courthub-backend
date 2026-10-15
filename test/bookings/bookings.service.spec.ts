@@ -9,17 +9,32 @@ describe('BookingsService', () => {
   const pricing = [{ startTime: '05:00', endTime: '22:00', hourlyRate: 150000 }];
 
   function createService(overrides: any = {}) {
-    return new BookingsService({
-      findCourtForBooking: mockResolved(court),
-      findPricingRules: mockResolved(pricing),
-      create: jest
-        .fn<(...args: any[]) => Promise<any>>()
-        .mockImplementation(async (values) => ({ ...values, createdAt: new Date() })),
-      listMine: mockResolved([]),
-      listForPartner: mockResolved([]),
-      listForAdmin: mockResolved([]),
-      ...overrides,
-    } as unknown as BookingsRepository);
+    return new BookingsService(
+      {
+        findCourtForBooking: mockResolved(court),
+        findPricingRules: mockResolved(pricing),
+        create: jest
+          .fn<(...args: any[]) => Promise<any>>()
+          .mockImplementation(async (values) => ({ ...values, createdAt: new Date() })),
+        listMine: mockResolved([]),
+        listForPartner: mockResolved([]),
+        listForAdmin: mockResolved([]),
+        cancel: mockResolved(undefined),
+        ...overrides,
+      } as unknown as BookingsRepository,
+      {
+        createForBooking: mockResolved({
+          payment: {
+            id: 'payment-1',
+            bookingId: 'booking-1',
+            status: 'PENDING',
+            amount: 150000,
+            checkoutUrl: 'https://payos.example/checkout',
+            expiresAt: new Date(),
+          },
+        }),
+      } as any,
+    );
   }
 
   const dto = {
@@ -30,10 +45,10 @@ describe('BookingsService', () => {
     contactPhone: '0901234567',
   };
 
-  it('creates a confirmed booking and calculates its price', async () => {
+  it('creates a payment-hold booking and calculates its price', async () => {
     const service = createService();
     const result = await service.create(dto, null);
-    expect(result.booking.status).toBe('CONFIRMED');
+    expect(result.booking.status).toBe('AWAITING_PAYMENT');
     expect(result.booking.totalAmount).toBe(150000);
   });
 
@@ -67,7 +82,7 @@ describe('BookingsService', () => {
       findForTransition: mockResolved({ booking: { status: 'PENDING' }, ownerId: 'partner-1' }),
       transition: mockResolved({ id: 'b1' }),
     };
-    const service = new BookingsService(repository as any);
+    const service = new BookingsService(repository as any, {} as any);
     await expect(service.listMine('u1')).resolves.toEqual(['mine']);
     await expect(service.listForPartner('p1')).resolves.toEqual(['partner']);
     await expect(service.listForAdmin()).resolves.toEqual(['admin']);

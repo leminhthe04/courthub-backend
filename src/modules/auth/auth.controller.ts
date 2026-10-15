@@ -119,13 +119,13 @@ export class AuthController {
     response: Response,
     tokens: { accessToken: string; refreshToken: string },
   ) {
-    const isProduction = this.config.nodeEnv === 'production';
+    const { sameSite, secure } = this.config.cookieOptions;
 
     // 1. Access Token: short-lived (15m), HttpOnly, sent to all paths
     response.cookie('access_token', tokens.accessToken, {
       httpOnly: true,
-      sameSite: 'lax',
-      secure: isProduction,
+      sameSite,
+      secure,
       path: '/',
       maxAge: this.config.accessTokenTtlMinutes * 60 * 1000,
     });
@@ -133,26 +133,26 @@ export class AuthController {
     // 2. Refresh Token: long-lived (7d), HttpOnly, scoped strictly to /api/auth
     response.cookie('refresh_token', tokens.refreshToken, {
       httpOnly: true,
-      sameSite: 'lax',
-      secure: isProduction,
+      sameSite,
+      secure,
       path: '/api/auth',
       maxAge: this.config.refreshTokenTtlDays * 24 * 60 * 60 * 1000,
     });
   }
 
   private clearAuthCookies(response: Response) {
-    const isProduction = this.config.nodeEnv === 'production';
+    const { sameSite, secure } = this.config.cookieOptions;
 
     response.clearCookie('access_token', {
       httpOnly: true,
-      sameSite: 'lax',
-      secure: isProduction,
+      sameSite,
+      secure,
       path: '/',
     });
     response.clearCookie('refresh_token', {
       httpOnly: true,
-      sameSite: 'lax',
-      secure: isProduction,
+      sameSite,
+      secure,
       path: '/api/auth',
     });
   }

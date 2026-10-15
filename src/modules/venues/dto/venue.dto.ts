@@ -23,16 +23,8 @@ export class ListVenueDto {
   search?: string;
 
   @IsOptional()
-  @IsString()
-  city?: string;
-
-  @IsOptional()
   @IsUUID()
   categoryId?: string;
-
-  @IsOptional()
-  @IsString()
-  sportType?: string;
 
   @IsOptional()
   @Type(() => Number)
